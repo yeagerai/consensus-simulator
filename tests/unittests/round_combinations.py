@@ -1,94 +1,97 @@
-from fee_simulator.constants import ROUND_SIZES
-from fee_simulator.core.majority import compute_majority
+import numpy as np
 
 
-# TODO: todos contra todos
-def get_validators_vote_configs(num_validators, majority):
-    majority_threshold = (num_validators // 2) + 1
-    if majority == "AGREE":
-        return ["AGREE"] * majority_threshold + ["DISAGREE"] * (
-            num_validators - majority_threshold
-        )
-    elif majority == "DISAGREE":
-        return ["DISAGREE"] * majority_threshold + ["AGREE"] * (
-            num_validators - majority_threshold
-        )
-    elif majority == "TIMEOUT":
-        return ["TIMEOUT"] * majority_threshold + ["AGREE"] * (
-            num_validators - majority_threshold
-        )
-    elif majority == "UNDETERMINED":
-        return (
-            ["AGREE"] * (num_validators // 3)
-            + ["TIMEOUT"] * (num_validators // 3)
-            + ["DISAGREE"] * (num_validators - 2 * num_validators // 3)
-        )
+def count_paths_adj_matrix(dependency_graph, max_rounds, source_nodes, verbose=False):
+    nodes = sorted(dependency_graph.keys())
+    n = len(nodes)
+    A = np.zeros((n, n), dtype=int)
+
+    for i, node in enumerate(nodes):
+        for next_node in dependency_graph[node]:
+            j = nodes.index(next_node)
+            A[i, j] = 1
+
+    source_indices = [nodes.index(node) for node in source_nodes]
+    total_paths = len(source_nodes)
+    if verbose:
+        print(f"Length 1: {total_paths}")
+
+    current_power = A
+    for k in range(1, max_rounds):
+        paths_k = sum(np.sum(current_power[idx]) for idx in source_indices)
+        total_paths += paths_k
+        if verbose:
+            print(f"Length {k+1}: {paths_k}")
+        current_power = np.dot(current_power, A)
+
+    return total_paths
 
 
-def get_full_vote_configs(num_validators, majority):
-    return ["LEADER_RECEIPT", "AGREE"] + get_validators_vote_configs(
-        num_validators - 1, majority
+def generate_all_paths(graph, max_depth, source_nodes, verbose=False):
+    def dfs(current_node, current_path, depth):
+        # Add the current path at every step (including length 1)
+        length = len(current_path)  # depth 0 -> length 1, depth 1 -> length 2, etc.
+        length_counts[length] = length_counts.get(length, 0) + 1
+        all_paths.append(current_path[:])
+
+        # Stop if we've reached the maximum depth
+        if depth >= max_depth:
+            return
+
+        # Explore next nodes
+        next_nodes = graph.get(current_node, [])
+        for next_node in next_nodes:
+            current_path.append(next_node)
+            dfs(next_node, current_path, depth + 1)
+            current_path.pop()
+
+    all_paths = []
+    length_counts = {}
+
+    for start_node in source_nodes:
+        dfs(start_node, [start_node], 0)
+
+    if verbose:
+        for length in range(1, max_depth + 1):
+            print(f"Generate all paths Length {length}: {length_counts.get(length, 0)}")
+
+    return all_paths
+
+
+# Combined Dependency Graph
+combined_graph = {
+    "LEADER_RECEIPT": [
+        "MAJORITY_AGREE",
+        "UNDETERMINED",
+        "MAJORITY_DISAGREE",
+        "MAJORITY_TIMEOUT",
+    ],
+    "LEADER_TIMEOUT": ["LEADER_APPEAL"],
+    "MAJORITY_AGREE": ["VALIDATOR_APPEAL"],
+    "UNDETERMINED": ["LEADER_APPEAL"],
+    "MAJORITY_DISAGREE": ["LEADER_APPEAL"],
+    "MAJORITY_TIMEOUT": ["VALIDATOR_APPEAL"],
+    "VALIDATOR_APPEAL": ["LEADER_RECEIPT", "LEADER_TIMEOUT"],
+    "LEADER_APPEAL": ["LEADER_RECEIPT", "LEADER_TIMEOUT"],
+}
+
+depth = 17
+source_nodes = ["LEADER_RECEIPT", "LEADER_TIMEOUT"]
+dfs_depth = depth - 1
+all_paths = generate_all_paths(combined_graph, dfs_depth, source_nodes)
+
+if __name__ == "__main__":
+    # Compute total paths (adjacency matrix)
+    depth = 17
+    source_nodes = ["LEADER_RECEIPT", "LEADER_TIMEOUT"]
+    total_paths = count_paths_adj_matrix(combined_graph, depth, source_nodes)
+    print(
+        f"Total Transactions (up to depth {depth}, starting from {source_nodes}): {total_paths}"
     )
 
-
-def get_leader_timeout_vote_configs(num_validators):
-    return ["LEADER_TIMEOUT", "NA"] + ["NA"] * (num_validators - 1)
-
-
-def get_leader_appeal_vote_configs(num_validators):
-    return ["NA"] * (num_validators)
-
-
-def generate_rounds(num_rounds):
-    base_round_types = ["RECEIPT", "TIMEOUT"]
-    possible_majorities = ["AGREE", "DISAGREE", "TIMEOUT", "UNDETERMINED"]
-    appeal_types = ["LEADER_APPEAL", "VALIDATOR_APPEAL"]
-    all_possible_transactions = []
-    is_appeal_round = False
-    for round_index in range(num_rounds):
-        transaction_to_append = []
-        if round_index % 2 == 1:
-            is_appeal_round = True
-        num_validators = ROUND_SIZES[round_index]
-
-        if is_appeal_round:
-            for appeal_type in appeal_types:
-                if appeal_type == "LEADER_APPEAL":
-                    transaction_to_append.append(
-                        get_leader_appeal_vote_configs(num_validators)
-                    )
-                else:
-                    for majority in possible_majorities:
-                        transaction_to_append.append(
-                            get_validators_vote_configs(num_validators, majority)
-                        )
-                        if majority != compute_majority(
-                            transaction_to_append[-1]
-                        ):  # if new majority is different than previous majority -> next round, else it finishes there
-                            ...
-                        else:
-                            ...
-        else:
-            for base_round_type in base_round_types:
-                if base_round_type == "RECEIPT":
-                    for majority in possible_majorities:
-                        transaction_to_append.append(
-                            get_full_vote_configs(num_validators, majority)
-                        )
-                else:
-                    transaction_to_append.append(
-                        get_leader_timeout_vote_configs(num_validators)
-                    )
-            all_possible_transactions.append(transaction_to_append)
-
-    return all_possible_transactions
-
-
-# example of a transaction
-# [
-#     [
-#         ["LEADER_RECEIPT", "AGREE", "AGREE", "AGREE", "AGREE"], # 5 normal round
-#         ["DISAGREE","DISAGREE","DISAGREE", "DISAGREE", "DISAGREE", "AGREE", "AGREE"], # 7 and is a successful validator appeal round
-#         ["LEADER_RECEIPT", "AGREE", "AGREE", "AGREE", "AGREE", "AGREE", "AGREE", "AGREE", "AGREE", "AGREE", "AGREE"], # 11 normal round
-#     ]
-# ]
+    # Print all paths (DFS, adjust max_depth to match lengths 1 to 17)
+    dfs_depth = depth - 1  # Depth 16 gives paths of length 1 to 17
+    all_paths = generate_all_paths(combined_graph, dfs_depth, source_nodes)
+print(
+    f"All Paths (up to depth {dfs_depth}, starting from {source_nodes}): length {len(all_paths)}"
+)
