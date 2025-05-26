@@ -165,9 +165,7 @@ def path_to_transaction_results(path, addresses_pool, vote_configs):
 
 
 # Test with all paths (limited to 32 paths for efficiency)
-@pytest.mark.parametrize(
-    "path", list(itertools.islice(all_paths, 32)), ids=lambda x: f"path_{'-'.join(x)}"
-)
+@pytest.mark.parametrize("path", all_paths, ids=lambda x: f"path_{'-'.join(x)}")
 def test_paths_with_invariants(verbose, debug, path):
     """
     Test each path from all_paths with check_invariants.
