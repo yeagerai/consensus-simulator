@@ -93,15 +93,15 @@ def test_leader_timeout_50_previous_appeal_bond(verbose, debug):
     if debug:
         display_fee_distribution(fee_events)
 
-    # Invariant Check
-    check_invariants(fee_events, transaction_budget, transaction_results)
-
     # Round Label Assert
     assert round_labels == [
         "LEADER_TIMEOUT_50_PERCENT",
         "APPEAL_LEADER_TIMEOUT_UNSUCCESSFUL",
         "LEADER_TIMEOUT_50_PREVIOUS_APPEAL_BOND",
     ], f"Expected ['LEADER_TIMEOUT_50_PERCENT', 'APPEAL_LEADER_TIMEOUT_UNSUCCESSFUL', 'LEADER_TIMEOUT_50_PREVIOUS_APPEAL_BOND'], got {round_labels}"
+
+    # Invariant Check
+    check_invariants(fee_events, transaction_budget, transaction_results)
 
     # Everyone Else 0 Fees Assert
     assert all(

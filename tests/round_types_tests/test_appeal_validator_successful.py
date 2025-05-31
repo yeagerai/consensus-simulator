@@ -99,15 +99,15 @@ def test_appeal_validator_successful(verbose, debug):
     if debug:
         display_fee_distribution(fee_events)
 
-    # Invariant Check
-    check_invariants(fee_events, transaction_budget, transaction_results)
-
     # Round Label Assert
     assert round_labels == [
         "SKIP_ROUND",
         "APPEAL_VALIDATOR_SUCCESSFUL",
         "NORMAL_ROUND",
     ], f"Expected ['SKIP_ROUND', 'APPEAL_VALIDATOR_SUCCESSFUL', 'NORMAL_ROUND'], got {round_labels}"
+
+    # Invariant Check
+    check_invariants(fee_events, transaction_budget, transaction_results)
 
     # Everyone Else 0 Fees Assert
     assert all(

@@ -99,16 +99,15 @@ def test_leader_timeout_150_previous_normal_round(verbose, debug):
     if debug:
         display_fee_distribution(fee_events)
 
-    # Invariant Check
-    check_invariants(fee_events, transaction_budget, transaction_results)
-
     # Round Label Assert
-    print(f"round_labels: {round_labels}")
     assert round_labels == [
         "SKIP_ROUND",
         "APPEAL_LEADER_TIMEOUT_SUCCESSFUL",
         "LEADER_TIMEOUT_150_PREVIOUS_NORMAL_ROUND",
     ], f"Expected ['SKIP_ROUND', 'APPEAL_LEADER_TIMEOUT_SUCCESSFUL', 'LEADER_TIMEOUT_150_PREVIOUS_NORMAL_ROUND'], got {round_labels}"
+
+    # Invariant Check
+    check_invariants(fee_events, transaction_budget, transaction_results)
 
     # Everyone Else 0 Fees Assert
     assert all(

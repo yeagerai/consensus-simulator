@@ -98,15 +98,15 @@ def test_appeal_leader_unsuccessful(verbose, debug):
     if debug:
         display_fee_distribution(fee_events)
 
-    # Invariant Check
-    check_invariants(fee_events, transaction_budget, transaction_results)
-
     # Round Label Assert
     assert round_labels == [
         "NORMAL_ROUND",
         "APPEAL_LEADER_UNSUCCESSFUL",
         "SPLIT_PREVIOUS_APPEAL_BOND",
     ], f"Expected ['NORMAL_ROUND', 'APPEAL_LEADER_UNSUCCESSFUL', 'SPLIT_PREVIOUS_APPEAL_BOND'], got {round_labels}"
+
+    # Invariant Check
+    check_invariants(fee_events, transaction_budget, transaction_results)
 
     # Everyone Else 0 Fees Assert
     assert all(

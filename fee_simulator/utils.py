@@ -74,8 +74,9 @@ def from_wei(value: int, decimals: int = 18) -> Decimal:
 def split_amount(amount: int, num_recipients: int, decimals: int = 18) -> int:
     if num_recipients == 0:
         raise ValueError("Number of recipients cannot be zero")
+
     d_amount = from_wei(amount, decimals)
     per_recipient = (d_amount / num_recipients).quantize(
-        Decimal("1."), rounding=ROUND_DOWN
+        Decimal("0." + "0" * (decimals - 1) + "1"), rounding=ROUND_DOWN
     )
     return to_wei(per_recipient, decimals)

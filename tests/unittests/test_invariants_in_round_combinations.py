@@ -1,5 +1,7 @@
 import pytest
 import itertools
+import os
+from datetime import datetime
 from fee_simulator.models import (
     TransactionRoundResults,
     Round,
@@ -25,6 +27,10 @@ LEADER_TIMEOUT = 100
 VALIDATORS_TIMEOUT = 200
 VOTE_TYPES = ["AGREE", "DISAGREE", "TIMEOUT"]
 LEADER_ACTIONS = ["LEADER_RECEIPT", "LEADER_TIMEOUT"]
+
+# Create output directory
+OUTPUT_DIR = "test_results"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Generate addresses
 addresses_pool = [generate_random_eth_address() for _ in range(2000)]
@@ -164,7 +170,27 @@ def path_to_transaction_results(path, addresses_pool, vote_configs):
     return TransactionRoundResults(rounds=rounds), transaction_budget
 
 
-slice_size = 300
+def write_test_output(filename, content):
+    """Write test output to a file in the OUTPUT_DIR"""
+    filepath = os.path.join(OUTPUT_DIR, filename)
+    with open(filepath, "w") as f:
+        f.write(content)
+    return filepath
+
+
+def capture_display_output(func, *args, **kwargs):
+    """Capture the output of display functions"""
+    import io
+    import sys
+    from contextlib import redirect_stdout
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        func(*args, **kwargs)
+    return f.getvalue()
+
+
+slice_size = 50
 
 
 @pytest.mark.parametrize(
@@ -178,28 +204,117 @@ def test_paths_with_invariants(verbose, debug, path):
     """
     test_description = f"Testing transaction path: {' -> '.join(path)}. Verifies round labeling, fee distribution, and invariants."
 
+    # Initialize output content
+    output_content = []
+    output_content.append(f"TEST PATH: {' -> '.join(path)}")
+    output_content.append(f"Timestamp: {datetime.now().isoformat()}")
+    output_content.append("=" * 80)
+    output_content.append("")
+
+    success = False
+    error_message = ""
+
+    try:
+        # Generate transaction results
+        transaction_results, transaction_budget = path_to_transaction_results(
+            path, addresses_pool, VOTE_CONFIGS
+        )
+
+        # Process transaction
+        fee_events, round_labels = process_transaction(
+            addresses=addresses_pool,
+            transaction_results=transaction_results,
+            transaction_budget=transaction_budget,
+        )
+
+        # Capture outputs
+        output_content.append("ROUND LABELS:")
+        output_content.append(str(round_labels))
+        output_content.append("")
+
+        output_content.append("SUMMARY TABLE:")
+        summary_output = capture_display_output(
+            display_summary_table,
+            fee_events,
+            transaction_results,
+            transaction_budget,
+            round_labels,
+        )
+        output_content.append(summary_output)
+        output_content.append("")
+
+        output_content.append("TRANSACTION RESULTS:")
+        results_output = capture_display_output(
+            display_transaction_results, transaction_results, round_labels
+        )
+        output_content.append(results_output)
+        output_content.append("")
+
+        if debug:
+            output_content.append("FEE DISTRIBUTION:")
+            fee_output = capture_display_output(display_fee_distribution, fee_events)
+            output_content.append(fee_output)
+            output_content.append("")
+
+        # Check invariants
+        output_content.append("INVARIANT CHECK:")
+        try:
+            check_invariants(fee_events, transaction_budget, transaction_results)
+            output_content.append("✓ All invariants passed")
+            success = True
+        except AssertionError as e:
+            error_message = str(e)
+            output_content.append(f"✗ Invariant failed: {error_message}")
+            success = False
+        except Exception as e:
+            error_message = f"{type(e).__name__}: {str(e)}"
+            output_content.append(
+                f"✗ Unexpected error in invariant check: {error_message}"
+            )
+            success = False
+
+    except Exception as e:
+        error_message = f"{type(e).__name__}: {str(e)}"
+        output_content.append(f"✗ Test failed with error: {error_message}")
+        import traceback
+
+        output_content.append("")
+        output_content.append("TRACEBACK:")
+        output_content.append(traceback.format_exc())
+        success = False
+
+    # Generate filename
+    status_prefix = "S" if success else "F"
+    safe_path_name = "_".join(
+        path[:3]
+    )  # Use first 3 elements to keep filename reasonable
+    if len(path) > 3:
+        safe_path_name += f"_plus{len(path)-3}"
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # Include milliseconds
+    filename = f"{status_prefix}_{safe_path_name}_{timestamp}.txt"
+
+    # Write output
+    full_content = "\n".join(output_content)
+    filepath = write_test_output(filename, full_content)
+
+    # Print summary to console
+    status_symbol = "✓" if success else "✗"
+    print(f"{status_symbol} {' -> '.join(path)} -> {filepath}")
+
+    # If verbose, also display in console
     if verbose:
         display_test_description(
             test_name=f"test_path_{'-'.join(path)}",
             test_description=test_description,
         )
-
-    transaction_results, transaction_budget = path_to_transaction_results(
-        path, addresses_pool, VOTE_CONFIGS
-    )
-
-    fee_events, round_labels = process_transaction(
-        addresses=addresses_pool,
-        transaction_results=transaction_results,
-        transaction_budget=transaction_budget,
-    )
-
-    if verbose:
         display_summary_table(
             fee_events, transaction_results, transaction_budget, round_labels
         )
         display_transaction_results(transaction_results, round_labels)
+
     if debug:
         display_fee_distribution(fee_events)
 
-    check_invariants(fee_events, transaction_budget, transaction_results)
+    # Re-raise the error to mark test as failed
+    if not success:
+        pytest.fail(f"Test failed: {error_message}")

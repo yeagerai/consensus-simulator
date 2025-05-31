@@ -76,43 +76,61 @@ def apply_leader_timeout_150_previous_normal_round(
         )
     )
 
-    # Distribute to majority validators
-    for addr in majority_addresses:
-        events.append(
-            FeeEvent(
-                sequence_id=event_sequence.next_id(),
-                address=addr,
-                round_index=round_index,
-                round_label="LEADER_TIMEOUT_150_PREVIOUS_NORMAL_ROUND",
-                role="VALIDATOR",
-                vote=normalize_vote(votes[addr]),
-                hash="0xdefault",
-                cost=0,
-                staked=0,
-                earned=budget.validatorsTimeout
-                + split_amount(appeal_bond, len(majority_addresses)),
-                slashed=0,
-                burned=0,
+    if majority == "UNDETERMINED":
+        for addr in votes.keys():
+            events.append(
+                FeeEvent(
+                    sequence_id=event_sequence.next_id(),
+                    address=addr,
+                    round_index=round_index,
+                    round_label="SPLIT_PREVIOUS_APPEAL_BOND",
+                    role="VALIDATOR",
+                    vote=normalize_vote(votes[addr]),
+                    hash="0xdefault",
+                    cost=0,
+                    staked=0,
+                    earned=budget.validatorsTimeout,  # Only the split, no timeout
+                    slashed=0,
+                    burned=0,
+                )
             )
-        )
+    else:
+        # Distribute to majority validators
+        for addr in majority_addresses:
+            events.append(
+                FeeEvent(
+                    sequence_id=event_sequence.next_id(),
+                    address=addr,
+                    round_index=round_index,
+                    round_label="LEADER_TIMEOUT_150_PREVIOUS_NORMAL_ROUND",
+                    role="VALIDATOR",
+                    vote=normalize_vote(votes[addr]),
+                    hash="0xdefault",
+                    cost=0,
+                    staked=0,
+                    earned=budget.validatorsTimeout,
+                    slashed=0,
+                    burned=0,
+                )
+            )
 
-    # Penalize minority validators
-    for addr in minority_addresses:
-        events.append(
-            FeeEvent(
-                sequence_id=event_sequence.next_id(),
-                address=addr,
-                round_index=round_index,
-                round_label="LEADER_TIMEOUT_150_PREVIOUS_NORMAL_ROUND",
-                role="VALIDATOR",
-                vote=normalize_vote(votes[addr]),
-                hash="0xdefault",
-                cost=0,
-                staked=0,
-                earned=0,
-                slashed=0,
-                burned=PENALTY_REWARD_COEFFICIENT * budget.validatorsTimeout,
+        # Penalize minority validators
+        for addr in minority_addresses:
+            events.append(
+                FeeEvent(
+                    sequence_id=event_sequence.next_id(),
+                    address=addr,
+                    round_index=round_index,
+                    round_label="LEADER_TIMEOUT_150_PREVIOUS_NORMAL_ROUND",
+                    role="VALIDATOR",
+                    vote=normalize_vote(votes[addr]),
+                    hash="0xdefault",
+                    cost=0,
+                    staked=0,
+                    earned=0,
+                    slashed=0,
+                    burned=PENALTY_REWARD_COEFFICIENT * budget.validatorsTimeout,
+                )
             )
-        )
 
     return events

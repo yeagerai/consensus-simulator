@@ -12,6 +12,7 @@ from fee_simulator.core.majority import (
 )
 from fee_simulator.core.bond_computing import compute_appeal_bond
 from fee_simulator.constants import PENALTY_REWARD_COEFFICIENT
+from fee_simulator.utils import split_amount
 
 
 def apply_split_previous_appeal_bond(
@@ -20,13 +21,21 @@ def apply_split_previous_appeal_bond(
     budget: TransactionBudget,
     event_sequence: EventSequence,
 ) -> List[FeeEvent]:
+    """
+    Distribute the previous appeal bond among validators in the current round.
+    This happens after an unsuccessful appeal.
+
+    The appeal bond (minus leader timeout) is split among:
+    - All validators equally if there's no majority (UNDETERMINED)
+    - Only majority validators if there's a clear majority
+    """
     events = []
     round = transaction_results.rounds[round_index]
+
     if (
         not round.rotations
         or not budget.appeals
-        or round_index < 1
-        or round_index - 1 > len(budget.appeals)
+        or round_index < 2  # Need at least 2 previous rounds
     ):
         return events
 
@@ -40,10 +49,15 @@ def apply_split_previous_appeal_bond(
         leader_timeout=budget.leaderTimeout,
         validators_timeout=budget.validatorsTimeout,
     )
+
+    # Amount to split is appeal bond minus leader timeout
     amount_to_split = appeal_bond - budget.leaderTimeout
+
     # Distribute to validators
     if majority == "UNDETERMINED":
-        undet_split_amount = (amount_to_split * 10**18 // len(votes)) // 10**18
+        # Split among all validators equally
+        undet_split_amount = split_amount(amount_to_split, len(votes))
+        print(f"Undetermined split amount: {undet_split_amount}")
         for addr in votes.keys():
             events.append(
                 FeeEvent(
@@ -56,13 +70,15 @@ def apply_split_previous_appeal_bond(
                     hash="0xdefault",
                     cost=0,
                     staked=0,
-                    earned=undet_split_amount,  # + budget.validatorsTimeout,
+                    earned=undet_split_amount,  # Only the split, no timeout
                     slashed=0,
                     burned=0,
                 )
             )
     else:
-        agree_split_amount = (appeal_bond * 10**18 // len(majority_addresses)) // 10**18
+        # Split among majority validators only
+        agree_split_amount = split_amount(amount_to_split, len(majority_addresses))
+
         for addr in majority_addresses:
             events.append(
                 FeeEvent(
@@ -75,11 +91,13 @@ def apply_split_previous_appeal_bond(
                     hash="0xdefault",
                     cost=0,
                     staked=0,
-                    earned=agree_split_amount,  # + budget.validatorsTimeout,
+                    earned=agree_split_amount,  # Full appeal bond split among majority
                     slashed=0,
                     burned=0,
                 )
             )
+
+        # Penalize minority validators
         for addr in minority_addresses:
             events.append(
                 FeeEvent(
@@ -98,7 +116,7 @@ def apply_split_previous_appeal_bond(
                 )
             )
 
-    # Award the leader
+    # Award the leader their timeout
     first_addr = next(iter(votes.keys()), None)
     if first_addr:
         events.append(
