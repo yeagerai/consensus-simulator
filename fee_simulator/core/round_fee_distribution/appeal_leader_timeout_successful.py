@@ -5,6 +5,7 @@ from fee_simulator.models import (
     TransactionBudget,
     FeeEvent,
     EventSequence,
+    RoundLabel,
 )
 from fee_simulator.core.bond_computing import compute_appeal_bond
 
@@ -14,6 +15,7 @@ def apply_appeal_leader_timeout_successful(
     round_index: int,
     budget: TransactionBudget,
     event_sequence: EventSequence,
+    round_labels: List[RoundLabel],
 ) -> List[FeeEvent]:
     events = []
     if not budget.appeals or round_index > len(budget.appeals):
@@ -24,6 +26,7 @@ def apply_appeal_leader_timeout_successful(
         normal_round_index=round_index - 1,
         leader_timeout=budget.leaderTimeout,
         validators_timeout=budget.validatorsTimeout,
+        round_labels=round_labels,
     )
     events.append(
         FeeEvent(

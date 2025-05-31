@@ -6,6 +6,7 @@ from fee_simulator.models import (
     FeeEvent,
     EventSequence,
 )
+from fee_simulator.types import RoundLabel
 from fee_simulator.core.majority import (
     compute_majority,
     who_is_in_vote_majority,
@@ -20,6 +21,7 @@ def apply_appeal_validator_unsuccessful(
     round_index: int,
     budget: TransactionBudget,
     event_sequence: EventSequence,
+    round_labels: List[RoundLabel],
 ) -> List[FeeEvent]:
     events = []
     round = transaction_results.rounds[round_index]
@@ -66,7 +68,11 @@ def apply_appeal_validator_unsuccessful(
                 )
             )
     total_to_burn = compute_unsuccessful_validator_appeal_burn(
-        round_index, budget.leaderTimeout, budget.validatorsTimeout, events
+        round_index,
+        budget.leaderTimeout,
+        budget.validatorsTimeout,
+        events,
+        round_labels=round_labels,
     )
     events.append(
         FeeEvent(

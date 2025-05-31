@@ -1,26 +1,37 @@
-from fee_simulator.constants import ROUND_SIZES
+from fee_simulator.utils import get_round_size, is_appeal_round
+from fee_simulator.types import RoundLabel
+from typing import List
 
 
 def compute_appeal_bond(
     normal_round_index: int,
     leader_timeout: int,
     validators_timeout: int,
+    round_labels: List[RoundLabel],
 ) -> int:
-    if (
-        normal_round_index % 2 != 0
-        or normal_round_index < 0
-        or normal_round_index >= len(ROUND_SIZES)
-    ):
+
+    # Validate this is actually a normal round index
+    if normal_round_index < 0 or normal_round_index >= len(round_labels):
         raise ValueError(f"Invalid normal round index: {normal_round_index}")
 
-    next_normal_size = (
-        ROUND_SIZES[normal_round_index + 2]
-        if normal_round_index + 2 < len(ROUND_SIZES)
-        else 0
-    )
+    if is_appeal_round(round_labels[normal_round_index]):
+        raise ValueError(f"Round {normal_round_index} is not a normal round")
 
-    next_cost = next_normal_size * validators_timeout
+    # The appeal round is the next round
+    appeal_round_index = normal_round_index + 1
 
-    total_cost = next_cost + leader_timeout
+    # Check that the next round exists and is an appeal
+    if appeal_round_index >= len(round_labels):
+        raise ValueError(f"No appeal round after normal round {normal_round_index}")
+
+    if not is_appeal_round(round_labels[appeal_round_index]):
+        raise ValueError(f"Round {appeal_round_index} is not an appeal round")
+
+    # Get the size of the appeal round itself
+    appeal_round_size = get_round_size(appeal_round_index, round_labels)
+
+    # Bond covers the cost of the appeal round
+    appeal_cost = appeal_round_size * validators_timeout
+    total_cost = appeal_cost + leader_timeout
 
     return max(total_cost, 0)

@@ -4,6 +4,7 @@ from fee_simulator.models import (
     TransactionBudget,
     FeeEvent,
     EventSequence,
+    RoundLabel,
 )
 from fee_simulator.core.majority import (
     compute_majority,
@@ -20,6 +21,7 @@ def apply_split_previous_appeal_bond(
     round_index: int,
     budget: TransactionBudget,
     event_sequence: EventSequence,
+    round_labels: List[RoundLabel],
 ) -> List[FeeEvent]:
     """
     Distribute the previous appeal bond among validators in the current round.
@@ -48,6 +50,7 @@ def apply_split_previous_appeal_bond(
         normal_round_index=round_index - 2,
         leader_timeout=budget.leaderTimeout,
         validators_timeout=budget.validatorsTimeout,
+        round_labels=round_labels,
     )
 
     # Amount to split is appeal bond minus leader timeout

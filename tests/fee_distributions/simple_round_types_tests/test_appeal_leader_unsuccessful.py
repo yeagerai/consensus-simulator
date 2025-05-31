@@ -120,6 +120,7 @@ def test_appeal_leader_unsuccessful(verbose, debug):
         normal_round_index=0,
         leader_timeout=leaderTimeout,
         validators_timeout=validatorsTimeout,
+        round_labels=round_labels,
     )
     undet_split_amount = (
         (appeal_bond - leaderTimeout) * 10**18 // len(rotation3.votes)

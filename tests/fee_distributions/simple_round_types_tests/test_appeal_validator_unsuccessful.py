@@ -104,6 +104,7 @@ def test_appeal_validator_unsuccessful(verbose, debug):
         normal_round_index=0,
         leader_timeout=leaderTimeout,
         validators_timeout=validatorsTimeout,
+        round_labels=round_labels,
     )
     assert (
         compute_total_costs(fee_events, addresses_pool[23]) == appeal_bond

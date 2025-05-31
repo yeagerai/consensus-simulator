@@ -5,6 +5,7 @@ from fee_simulator.models import (
     FeeEvent,
     EventSequence,
 )
+from fee_simulator.types import RoundLabel
 from fee_simulator.core.majority import (
     compute_majority,
     who_is_in_vote_majority,
@@ -20,6 +21,7 @@ def apply_leader_timeout_150_previous_normal_round(
     round_index: int,
     budget: TransactionBudget,
     event_sequence: EventSequence,
+    round_labels: List[RoundLabel],
 ) -> List[FeeEvent]:
     events = []
     round = transaction_results.rounds[round_index]
@@ -36,6 +38,7 @@ def apply_leader_timeout_150_previous_normal_round(
         normal_round_index=round_index - 2,
         leader_timeout=budget.leaderTimeout,
         validators_timeout=budget.validatorsTimeout,
+        round_labels=round_labels,
     )
 
     # Award the leader 150% of leaderTimeout

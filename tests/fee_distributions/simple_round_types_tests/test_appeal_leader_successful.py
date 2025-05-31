@@ -119,7 +119,7 @@ def test_appeal_leader_successful(verbose):
 
     # Appealant Fees Assert
     appeal_bond = compute_appeal_bond(
-        0, leaderTimeout, validatorsTimeout
+        0, leaderTimeout, validatorsTimeout, round_labels
     )  # Computed as per compute_appeal_bond for round_index=0
     assert (
         compute_total_earnings(fee_events, addresses_pool[23])

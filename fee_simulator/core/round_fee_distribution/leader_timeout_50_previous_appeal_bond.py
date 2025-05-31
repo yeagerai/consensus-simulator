@@ -4,6 +4,7 @@ from fee_simulator.models import (
     TransactionBudget,
     FeeEvent,
     EventSequence,
+    RoundLabel,
 )
 from fee_simulator.core.majority import normalize_vote
 from fee_simulator.core.bond_computing import compute_appeal_bond
@@ -14,6 +15,7 @@ def apply_leader_timeout_50_previous_appeal_bond(
     round_index: int,
     budget: TransactionBudget,
     event_sequence: EventSequence,
+    round_labels: List[RoundLabel],
 ) -> List[FeeEvent]:
     events = []
     round = transaction_results.rounds[round_index]
@@ -28,7 +30,10 @@ def apply_leader_timeout_50_previous_appeal_bond(
     votes = round.rotations[-1].votes
     sender_address = budget.senderAddress
     appeal_bond = compute_appeal_bond(
-        round_index - 2, budget.leaderTimeout, budget.validatorsTimeout
+        round_index - 2,
+        budget.leaderTimeout,
+        budget.validatorsTimeout,
+        round_labels=round_labels,
     )
 
     # Award half the appeal bond to the leader

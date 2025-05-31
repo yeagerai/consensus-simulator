@@ -121,6 +121,7 @@ def test_leader_timeout_150_previous_normal_round(verbose, debug):
         normal_round_index=0,
         leader_timeout=leaderTimeout,
         validators_timeout=validatorsTimeout,
+        round_labels=round_labels,
     )
     assert (
         compute_total_earnings(fee_events, addresses_pool[23])
