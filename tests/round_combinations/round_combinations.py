@@ -8,17 +8,20 @@ policy being separate from low-level details.
 
 from typing import Optional, List, Tuple
 
-from path_types import PathConstraints, Path
-from graph_data import TRANSACTION_GRAPH
-from path_counter import count_paths_between_nodes
-from path_generator import generate_all_paths, filter_paths_containing_pattern
-from path_analyzer import (
+from tests.round_combinations.path_types import PathConstraints, Path
+from tests.round_combinations.graph_data import TRANSACTION_GRAPH
+from tests.round_combinations.path_counter import count_paths_between_nodes
+from tests.round_combinations.path_generator import (
+    generate_all_paths,
+    filter_paths_containing_pattern,
+)
+from tests.round_combinations.path_analyzer import (
     analyze_paths,
     find_extreme_paths,
     find_paths_with_rare_patterns,
     calculate_path_diversity,
 )
-from path_display import (
+from tests.round_combinations.path_display import (
     StatisticsDisplay,
     PathFormatter,
     ProgressReporter,

@@ -8,15 +8,20 @@ into a print statement or a debugger expression, write it as a test instead."
 import unittest
 from typing import List
 
-from path_types import PathConstraints, Path
-from graph_data import TRANSACTION_GRAPH
-from path_counter import count_paths_between_nodes, get_reachable_nodes
-from path_generator import (
+from tests.round_combinations.path_types import PathConstraints, Path
+from tests.round_combinations.graph_data import TRANSACTION_GRAPH
+from tests.round_combinations.path_counter import (
+    count_paths_between_nodes,
+    get_reachable_nodes,
+)
+from tests.round_combinations.path_generator import (
     generate_all_paths,
     filter_paths_containing_pattern,
-    path_edge_count,
 )
-from path_analyzer import analyze_paths, _count_appeals_in_path
+from tests.round_combinations.path_analyzer import (
+    analyze_paths,
+    _count_appeals_in_path,
+)
 
 
 class TestPathCounting(unittest.TestCase):

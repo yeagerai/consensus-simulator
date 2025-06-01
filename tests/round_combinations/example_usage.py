@@ -4,13 +4,20 @@ Example usage of the round combinations analysis system.
 This file demonstrates various ways to use the refactored modules.
 """
 
-from path_types import PathConstraints
-from graph_data import TRANSACTION_GRAPH
-from path_counter import count_paths_between_nodes
-from path_generator import generate_all_paths, generate_paths_lazy
-from path_analyzer import analyze_paths, find_extreme_paths, group_paths_by_feature
-from path_display import PathFormatter, StatisticsDisplay
-from round_combinations import TransactionPathAnalyzer
+from tests.round_combinations.path_types import PathConstraints
+from tests.round_combinations.graph_data import TRANSACTION_GRAPH
+from tests.round_combinations.path_counter import count_paths_between_nodes
+from tests.round_combinations.path_generator import (
+    generate_all_paths,
+    generate_paths_lazy,
+)
+from tests.round_combinations.path_analyzer import (
+    analyze_paths,
+    find_extreme_paths,
+    group_paths_by_feature,
+)
+from tests.round_combinations.path_display import PathFormatter, StatisticsDisplay
+from tests.round_combinations.round_combinations import TransactionPathAnalyzer
 
 
 def example_1_basic_counting():

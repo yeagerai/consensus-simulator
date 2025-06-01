@@ -11,11 +11,20 @@ from collections import defaultdict
 from typing import Dict, List, Optional, TextIO
 from datetime import datetime
 
-from path_types import PathConstraints, Path, PathStatistics, SPECIAL_NODES
-from graph_data import TRANSACTION_GRAPH
-from path_counter import count_paths_between_nodes
-from path_generator import generate_paths_lazy
-from path_display import StatisticsDisplay, ProgressReporter, PathFormatter
+from tests.round_combinations.path_types import (
+    PathConstraints,
+    Path,
+    PathStatistics,
+    SPECIAL_NODES,
+)
+from tests.round_combinations.graph_data import TRANSACTION_GRAPH
+from tests.round_combinations.path_counter import count_paths_between_nodes
+from tests.round_combinations.path_generator import generate_paths_lazy
+from tests.round_combinations.path_display import (
+    StatisticsDisplay,
+    ProgressReporter,
+    PathFormatter,
+)
 
 
 class CriticalPathAnalyzer:

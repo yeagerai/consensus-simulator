@@ -7,7 +7,12 @@ from the business logic.
 
 from typing import List, Dict, Optional, Tuple
 
-from path_types import Path, PathStatistics, CountingResult, SPECIAL_NODES
+from tests.round_combinations.path_types import (
+    Path,
+    PathStatistics,
+    CountingResult,
+    SPECIAL_NODES,
+)
 
 
 class PathFormatter:

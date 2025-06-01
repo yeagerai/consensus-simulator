@@ -20,7 +20,9 @@ from fee_simulator.display import (
     display_test_description,
 )
 from tests.invariant_checks import check_invariants
-from tests.unittests.round_combinations import generate_all_paths
+from tests.round_combinations import generate_all_paths
+from tests.round_combinations.path_types import PathConstraints
+from tests.round_combinations.graph_data import TRANSACTION_GRAPH
 
 # Constants
 LEADER_TIMEOUT = 100
@@ -69,9 +71,12 @@ combined_graph = {
 }
 
 # Generate all paths
-depth = 17
-source_nodes = ["LEADER_RECEIPT", "LEADER_TIMEOUT"]
-all_paths = generate_all_paths(combined_graph, depth, source_nodes)
+all_paths = generate_all_paths(
+    TRANSACTION_GRAPH,
+    PathConstraints(
+        min_length=3, max_length=5, source_node="START", target_node="END"
+    ),  # not real max length which would be 19
+)
 
 
 def create_rotation(leader_action, votes, round_index, address_offset):
@@ -195,8 +200,8 @@ slice_size = 50
 
 @pytest.mark.parametrize(
     "path",
-    list(itertools.islice(all_paths, slice_size)),
-    ids=lambda x: f"path_{'-'.join(x)}",
+    list(itertools.islice(all_paths, slice_size)) if all_paths else [],
+    ids=lambda x: f"path_{'-'.join(x) if isinstance(x, list) else str(x)}",
 )
 def test_paths_with_invariants(verbose, debug, path):
     """

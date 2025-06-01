@@ -11,7 +11,12 @@ from typing import Dict, List, Optional
 from typing import Dict, List, Optional, Set
 import numpy as np
 
-from path_types import Graph, NodeName, PathConstraints, CountingResult
+from tests.round_combinations.path_types import (
+    Graph,
+    NodeName,
+    PathConstraints,
+    CountingResult,
+)
 
 
 def _build_adjacency_matrix(graph: Graph) -> tuple[np.ndarray, Dict[NodeName, int]]:

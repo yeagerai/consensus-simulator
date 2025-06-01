@@ -1,10 +1,3 @@
-"""
-Type definitions for the round combinations module.
-
-Following Rich Hickey's philosophy: "It is better to have 100 functions
-operate on one data structure than 10 functions on 10 data structures."
-"""
-
 from typing import List, Dict, NamedTuple
 
 

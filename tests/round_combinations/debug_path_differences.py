@@ -2,10 +2,10 @@
 Debug script to understand the difference between matrix counting and DFS generation.
 """
 
-from path_types import PathConstraints
-from graph_data import TRANSACTION_GRAPH
-from path_counter import count_paths_between_nodes
-from path_generator import generate_all_paths
+from tests.round_combinations.path_types import PathConstraints
+from tests.round_combinations.graph_data import TRANSACTION_GRAPH
+from tests.round_combinations.path_counter import count_paths_between_nodes
+from tests.round_combinations.path_generator import generate_all_paths
 from collections import defaultdict
 
 

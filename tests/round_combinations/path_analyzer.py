@@ -8,7 +8,7 @@ can understand. Good programmers write code that humans can understand."
 from typing import List, Dict, Set, Tuple
 from collections import Counter
 
-from path_types import (
+from tests.round_combinations.path_types import (
     Path,
     PathStatistics,
     SPECIAL_NODES,

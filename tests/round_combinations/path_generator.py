@@ -11,7 +11,12 @@ This matches the adjacency matrix counting method.
 
 from typing import List, Set, Generator, Dict
 
-from path_types import Graph, NodeName, Path, PathConstraints
+from tests.round_combinations.path_types import (
+    Graph,
+    NodeName,
+    Path,
+    PathConstraints,
+)
 
 
 def _is_valid_path_length(path: Path, constraints: PathConstraints) -> bool:
