@@ -1,8 +1,5 @@
 """
 Path analysis and statistics computation.
-
-Following Fowler's principle: "Any fool can write code that a computer
-can understand. Good programmers write code that humans can understand."
 """
 
 from typing import List, Dict, Set, Tuple

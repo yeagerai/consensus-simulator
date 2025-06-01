@@ -1,8 +1,5 @@
 """
 Example tests demonstrating how the refactored code is more testable.
-
-Following Fowler's principle: "Whenever you are tempted to type something
-into a print statement or a debugger expression, write it as a test instead."
 """
 
 import unittest

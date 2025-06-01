@@ -1,8 +1,5 @@
 """
 Graph data structure for the fee simulator round combinations.
-
-This module contains only data - no behavior, following Rich Hickey's
-philosophy of separating data from functions.
 """
 
 from types import MappingProxyType

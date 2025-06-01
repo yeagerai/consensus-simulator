@@ -19,7 +19,7 @@ from fee_simulator.display import (
     display_summary_table,
     display_test_description,
 )
-from tests.invariant_checks import check_invariants
+from tests.fee_distributions.check_invariants.invariant_checks import check_invariants
 from tests.round_combinations import generate_all_paths
 from tests.round_combinations.path_types import PathConstraints
 from tests.round_combinations.graph_data import TRANSACTION_GRAPH
@@ -51,23 +51,6 @@ VOTE_CONFIGS = {
     0: get_vote_configs(4),  # Round 0: 5 participants (4 validators + 1 leader)
     1: get_vote_configs(6),  # Round 1: 7 participants (6 validators + 1 leader)
     2: get_vote_configs(10),  # Round 2: 11 participants (10 validators + 1 leader)
-}
-
-# Combined Dependency Graph
-combined_graph = {
-    "LEADER_RECEIPT": [
-        "MAJORITY_AGREE",
-        "UNDETERMINED",
-        "MAJORITY_DISAGREE",
-        "MAJORITY_TIMEOUT",
-    ],
-    "LEADER_TIMEOUT": ["LEADER_APPEAL"],
-    "MAJORITY_AGREE": ["VALIDATOR_APPEAL"],
-    "UNDETERMINED": ["LEADER_APPEAL"],
-    "MAJORITY_DISAGREE": ["LEADER_APPEAL"],
-    "MAJORITY_TIMEOUT": ["VALIDATOR_APPEAL"],
-    "VALIDATOR_APPEAL": ["LEADER_RECEIPT", "LEADER_TIMEOUT"],
-    "LEADER_APPEAL": ["LEADER_RECEIPT", "LEADER_TIMEOUT"],
 }
 
 # Generate all paths
