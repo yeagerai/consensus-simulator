@@ -166,15 +166,19 @@ class TestRoundLabelingProperties:
         assert len(labels) == 1
 
         round = transaction_results.rounds[0]
-        if not round.rotations or not round.rotations[0].votes:
+        if not round.rotations or not round.rotations[-1].votes:
             assert labels[0] == "EMPTY_ROUND"
         else:
-            # Check if it's a leader timeout
-            first_vote = next(iter(round.rotations[0].votes.values()))
-            if isinstance(first_vote, list) and first_vote[0] == "LEADER_TIMEOUT":
-                assert labels[0] == "LEADER_TIMEOUT_50_PERCENT"
+            # Check if it's a leader timeout (use last rotation like the implementation)
+            last_rotation_votes = round.rotations[-1].votes
+            if last_rotation_votes:
+                first_vote = next(iter(last_rotation_votes.values()))
+                if isinstance(first_vote, list) and first_vote[0] == "LEADER_TIMEOUT":
+                    assert labels[0] == "LEADER_TIMEOUT_50_PERCENT"
+                else:
+                    assert labels[0] in ["NORMAL_ROUND", "LEADER_TIMEOUT_50_PERCENT"]
             else:
-                assert labels[0] in ["NORMAL_ROUND", "LEADER_TIMEOUT_50_PERCENT"]
+                assert labels[0] == "EMPTY_ROUND"
 
     def test_appeal_positioning_property(self):
         """Property: Appeals at odd indices get appeal labels."""

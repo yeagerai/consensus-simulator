@@ -506,7 +506,7 @@ class TestChainedUnsuccessfulAppeals:
 
         labels = label_rounds(transaction_results)
 
-        assert labels[0] == "LEADER_TIMEOUT_50_PERCENT"
+        assert labels[0] == "LEADER_TIMEOUT_50_PERCENT"  # First leader timeout gets 50%
         assert labels[1] == "APPEAL_LEADER_TIMEOUT_UNSUCCESSFUL"
         assert labels[2] == "LEADER_TIMEOUT_50_PREVIOUS_APPEAL_BOND"
 
@@ -712,10 +712,10 @@ class TestEdgeCases:
                                 addresses_pool[0]: [
                                     "LEADER_RECEIPT",
                                     "AGREE",
-                                    "0xhash1",
+                                    "0x1234567890abcdef",  # Valid hex format
                                 ],
-                                addresses_pool[1]: ["AGREE", "0xhash1"],
-                                addresses_pool[2]: ["DISAGREE", "0xhash2"],
+                                addresses_pool[1]: ["AGREE", "0x1234567890abcdef"],
+                                addresses_pool[2]: ["DISAGREE", "0xfedcba9876543210"],
                             }
                         )
                     ]

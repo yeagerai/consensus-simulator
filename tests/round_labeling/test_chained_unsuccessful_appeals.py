@@ -258,7 +258,7 @@ class TestChainedUnsuccessfulAppeals:
                         )
                     ]
                 ),
-                # Round 1: Leader appeal (unsuccessful - still undetermined)
+                # Round 1: Leader appeal (unsuccessful - next round still undetermined)
                 Round(
                     rotations=[
                         Rotation(
@@ -270,34 +270,34 @@ class TestChainedUnsuccessfulAppeals:
                         )
                     ]
                 ),
-                # Round 2: Normal round with majority (now triggers validator appeal)
+                # Round 2: Normal round still undetermined (appeal was unsuccessful)
                 Round(
                     rotations=[
                         Rotation(
                             votes={
                                 addresses_pool[8]: ["LEADER_RECEIPT", "AGREE"],
                                 addresses_pool[9]: "AGREE",
-                                addresses_pool[10]: "AGREE",
+                                addresses_pool[10]: "DISAGREE",
                                 addresses_pool[11]: "DISAGREE",
-                                addresses_pool[12]: "DISAGREE",
+                                addresses_pool[12]: "TIMEOUT",
                             }
                         )
                     ]
                 ),
-                # Round 3: Validator appeal (unsuccessful)
+                # Round 3: Another leader appeal (successful - next round has majority)
                 Round(
                     rotations=[
                         Rotation(
                             votes={
-                                addresses_pool[13]: "AGREE",
-                                addresses_pool[14]: "AGREE",
-                                addresses_pool[15]: "AGREE",
-                                addresses_pool[16]: "DISAGREE",
+                                addresses_pool[13]: "NA",
+                                addresses_pool[14]: "NA",
+                                addresses_pool[15]: "NA",
+                                addresses_pool[16]: "NA",
                             }
                         )
                     ]
                 ),
-                # Round 4: Final round
+                # Round 4: Final round with clear majority
                 Round(
                     rotations=[
                         Rotation(
@@ -305,6 +305,8 @@ class TestChainedUnsuccessfulAppeals:
                                 addresses_pool[17]: ["LEADER_RECEIPT", "AGREE"],
                                 addresses_pool[18]: "AGREE",
                                 addresses_pool[19]: "AGREE",
+                                addresses_pool[20]: "DISAGREE",
+                                addresses_pool[21]: "TIMEOUT",
                             }
                         )
                     ]
@@ -316,11 +318,9 @@ class TestChainedUnsuccessfulAppeals:
 
         assert labels[0] == "NORMAL_ROUND"
         assert labels[1] == "APPEAL_LEADER_UNSUCCESSFUL"
-        assert (
-            labels[2] == "SPLIT_PREVIOUS_APPEAL_BOND"
-        )  # Special case after unsuccessful leader appeal
-        assert labels[3] == "APPEAL_VALIDATOR_UNSUCCESSFUL"
-        assert labels[4] == "NORMAL_ROUND"
+        assert labels[2] == "SKIP_ROUND"  # Skip round due to successful appeal after
+        assert labels[3] == "APPEAL_LEADER_SUCCESSFUL"  # Successful because next round has majority
+        assert labels[4] == "NORMAL_ROUND"  # Normal round with majority
 
     def test_leader_timeout_unsuccessful_chain(self):
         """Test chain involving leader timeout unsuccessful appeals."""
@@ -391,7 +391,7 @@ class TestChainedUnsuccessfulAppeals:
 
         labels = label_rounds(transaction_results)
 
-        assert labels[0] == "LEADER_TIMEOUT_50_PERCENT"
+        assert labels[0] == "LEADER_TIMEOUT_50_PERCENT"  # First leader timeout gets 50%
         assert labels[1] == "APPEAL_LEADER_TIMEOUT_UNSUCCESSFUL"
         assert labels[2] == "LEADER_TIMEOUT_50_PREVIOUS_APPEAL_BOND"
         assert labels[3] == "APPEAL_LEADER_TIMEOUT_UNSUCCESSFUL"

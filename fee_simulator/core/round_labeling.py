@@ -50,9 +50,13 @@ def is_appeal_round(round_index: int) -> bool:
     return round_index % 2 == 1
 
 
-def classify_normal_round(leader_action: Optional[str]) -> RoundLabel:
+def classify_normal_round(
+    leader_action: Optional[str], is_only_round: bool
+) -> RoundLabel:
     """Classify a non-appeal round based on leader action."""
     if leader_action == "LEADER_TIMEOUT":
+        if is_only_round:
+            return "LEADER_TIMEOUT_50_PERCENT"
         return "LEADER_TIMEOUT"
     return "NORMAL_ROUND"
 
@@ -160,19 +164,30 @@ SPECIAL_CASE_PATTERNS = [
             ["APPEAL_LEADER_UNSUCCESSFUL", "APPEAL_VALIDATOR_UNSUCCESSFUL"],
             "NORMAL_ROUND",
         ],
-        "condition": lambda rounds, i: compute_majority(rounds[i])
-        in ["UNDETERMINED", "DISAGREE"],
+        "condition": lambda rounds, i: i + 2 < len(rounds)
+        and rounds[i + 2]
+        and compute_majority(rounds[i + 2]) in ["UNDETERMINED", "DISAGREE"],
         "changes": {2: "SPLIT_PREVIOUS_APPEAL_BOND"},
     },
     {
         "name": "Leader timeout 50% after unsuccessful appeal",
         "pattern": [
-            "LEADER_TIMEOUT",
+            "LEADER_TIMEOUT_50_PERCENT",
             "APPEAL_LEADER_TIMEOUT_UNSUCCESSFUL",
             "LEADER_TIMEOUT",
         ],
         "changes": {
-            0: "LEADER_TIMEOUT_50_PERCENT",
+            2: "LEADER_TIMEOUT_50_PREVIOUS_APPEAL_BOND",
+        },
+    },
+    {
+        "name": "Chained leader timeout 50% after unsuccessful appeal",
+        "pattern": [
+            "LEADER_TIMEOUT_50_PREVIOUS_APPEAL_BOND",
+            "APPEAL_LEADER_TIMEOUT_UNSUCCESSFUL",
+            "LEADER_TIMEOUT",
+        ],
+        "changes": {
             2: "LEADER_TIMEOUT_50_PREVIOUS_APPEAL_BOND",
         },
     },
@@ -211,8 +226,9 @@ def apply_special_cases(
 
         # Look for this pattern in the labels
         for i in range(len(new_labels) - len(pattern) + 1):
-            # Skip if already processed
-            if any(idx in processed_indices for idx in range(i, i + len(pattern))):
+            # Skip if the indices we want to change are already processed
+            changes_to_make = pattern_config["changes"]
+            if any((i + offset) in processed_indices for offset in changes_to_make):
                 continue
 
             # Check if pattern matches
@@ -227,9 +243,8 @@ def apply_special_cases(
             # Apply changes
             for offset, new_label in pattern_config["changes"].items():
                 new_labels[i + offset] = new_label
-
-            # Mark indices as processed
-            processed_indices.update(range(i, i + len(pattern)))
+                # Mark only the changed indices as processed
+                processed_indices.add(i + offset)
 
     return new_labels
 
@@ -249,6 +264,8 @@ def label_rounds(transaction_results: TransactionRoundResults) -> List[RoundLabe
 
     # Initial classification
     labels = []
+    total_rounds = len(rounds)
+
     for i, round_votes in enumerate(rounds):
         # Handle empty rounds
         if not round_votes:
@@ -259,15 +276,27 @@ def label_rounds(transaction_results: TransactionRoundResults) -> List[RoundLabe
         leader_action = get_leader_action(round_votes, leader_addresses[i])
 
         # Special case: single leader timeout
-        if is_single_leader_timeout(i, len(rounds), leader_action):
+        if is_single_leader_timeout(i, total_rounds, leader_action):
             labels.append("LEADER_TIMEOUT_50_PERCENT")
             continue
+
+        # Check for the specific pattern: LEADER_TIMEOUT -> APPEAL -> LEADER_TIMEOUT
+        # where the appeal will be unsuccessful
+        if (i == 0 and leader_action == "LEADER_TIMEOUT" and 
+            i + 2 < total_rounds):
+            # Check if next round is an appeal and round after that is leader timeout
+            next_leader_action = get_leader_action(rounds[i + 2], leader_addresses[i + 2])
+            if is_appeal_round(i + 1) and next_leader_action == "LEADER_TIMEOUT":
+                # This matches the pattern, so first timeout gets 50%
+                labels.append("LEADER_TIMEOUT_50_PERCENT")
+                continue
 
         # Classify based on round type
         if is_appeal_round(i):
             label = classify_appeal_round(i, rounds, leader_addresses)
         else:
-            label = classify_normal_round(leader_action)
+            is_only_round = total_rounds == 1
+            label = classify_normal_round(leader_action, is_only_round)
 
         labels.append(label)
 
