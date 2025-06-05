@@ -76,13 +76,13 @@ def test_normal_round(verbose, debug):
     if debug:
         display_fee_distribution(fee_events)
 
-    # Invariant Check
-    check_invariants(fee_events, transaction_budget, transaction_results)
-
     # Round Label Assert
     assert round_labels == [
         "NORMAL_ROUND"
     ], f"Expected ['NORMAL_ROUND'], got {round_labels}"
+
+    # Invariant Check
+    check_invariants(fee_events, transaction_budget, transaction_results)
 
     # Leader Fees Assert
     assert (
@@ -147,13 +147,13 @@ def test_normal_round_with_minority_penalties(verbose, debug):
     if debug:
         display_fee_distribution(fee_events)
 
-    # Invariant Check
-    check_invariants(fee_events, transaction_budget, transaction_results)
-
     # Round Label Assert
     assert round_labels == [
         "NORMAL_ROUND"
     ], f"Expected ['NORMAL_ROUND'], got {round_labels}"
+
+    # Invariant Check
+    check_invariants(fee_events, transaction_budget, transaction_results)
 
     # Leader Fees Assert
     assert (
@@ -231,13 +231,13 @@ def test_normal_round_no_majority(verbose, debug):
     if debug:
         display_fee_distribution(fee_events)
 
-    # Invariant Check
-    check_invariants(fee_events, transaction_budget, transaction_results)
-
     # Round Label Assert
     assert round_labels == [
         "NORMAL_ROUND"
     ], f"Expected ['NORMAL_ROUND'], got {round_labels}"
+
+    # Invariant Check
+    check_invariants(fee_events, transaction_budget, transaction_results)
 
     # Leader Fees Assert
     assert (
@@ -302,13 +302,13 @@ def test_normal_round_majority_disagree(verbose, debug):
     if debug:
         display_fee_distribution(fee_events)
 
-    # Invariant Check
-    check_invariants(fee_events, transaction_budget, transaction_results)
-
     # Round Label Assert
     assert round_labels == [
         "NORMAL_ROUND"
     ], f"Expected ['NORMAL_ROUND'], got {round_labels}"
+
+    # Invariant Check
+    check_invariants(fee_events, transaction_budget, transaction_results)
 
     # Leader Fees Assert
     assert (

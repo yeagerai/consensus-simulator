@@ -72,13 +72,13 @@ def test_leader_timeout_50_percent(verbose, debug):
     if debug:
         display_fee_distribution(fee_events)
 
-    # Invariant Check
-    check_invariants(fee_events, transaction_budget, transaction_results)
-
     # Round Label Assert
     assert round_labels == [
         "LEADER_TIMEOUT_50_PERCENT"
     ], f"Expected ['LEADER_TIMEOUT_50_PERCENT'], got {round_labels}"
+
+    # Invariant Check
+    check_invariants(fee_events, transaction_budget, transaction_results)
 
     # Leader Fees Assert
     assert (

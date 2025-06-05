@@ -5,6 +5,7 @@ from fee_simulator.models import (
     FeeEvent,
     EventSequence,
 )
+from fee_simulator.types import RoundLabel
 from fee_simulator.core.majority import normalize_vote
 
 
@@ -13,6 +14,7 @@ def apply_leader_timeout_50_percent(
     round_index: int,
     budget: TransactionBudget,
     event_sequence: EventSequence,
+    round_labels: List[RoundLabel],
 ) -> List[FeeEvent]:
     events = []
     round = transaction_results.rounds[round_index]

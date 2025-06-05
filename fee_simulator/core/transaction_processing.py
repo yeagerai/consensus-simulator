@@ -14,6 +14,7 @@ from fee_simulator.types import (
 from fee_simulator.utils import (
     compute_total_cost,
     initialize_constant_stakes,
+    is_appeal_round,
 )
 
 from fee_simulator.core.bond_computing import compute_appeal_bond
@@ -72,23 +73,33 @@ def process_transaction(
         if i < len(labels):
 
             # Subtract appeal bond from appealant address
-            if i % 2 == 1:
-                appealant_address = transaction_budget.appeals[i // 2].appealantAddress
-                bond = compute_appeal_bond(
-                    normal_round_index=i - 1,
-                    leader_timeout=transaction_budget.leaderTimeout,
-                    validators_timeout=transaction_budget.validatorsTimeout,
+            if is_appeal_round(labels[i]):  # Use the new function
+                # Find which appeal this is (counting only actual appeals)
+                appeal_count = sum(
+                    1 for j in range(i + 1) if is_appeal_round(labels[j])
                 )
-                fee_events.append(
-                    FeeEvent(
-                        sequence_id=event_sequence.next_id(),
-                        round_index=i,
-                        round_label=labels[i],
-                        role="APPEALANT",
-                        address=appealant_address,
-                        cost=bond,
+                appeal_index = appeal_count - 1
+
+                if appeal_index < len(transaction_budget.appeals):
+                    appealant_address = transaction_budget.appeals[
+                        appeal_index
+                    ].appealantAddress
+                    bond = compute_appeal_bond(
+                        normal_round_index=i - 1,
+                        leader_timeout=transaction_budget.leaderTimeout,
+                        validators_timeout=transaction_budget.validatorsTimeout,
+                        round_labels=labels,  # Pass labels
                     )
-                )
+                    fee_events.append(
+                        FeeEvent(
+                            sequence_id=event_sequence.next_id(),
+                            round_index=i,
+                            round_label=labels[i],
+                            role="APPEALANT",
+                            address=appealant_address,
+                            cost=bond,
+                        )
+                    )
 
             round_fee_events = distribute_round(
                 transaction_results=replace_idle_transaction_results,
@@ -96,10 +107,13 @@ def process_transaction(
                 label=labels[i],
                 budget=transaction_budget,
                 event_sequence=event_sequence,
+                round_labels=labels,  # Pass labels
             )
             fee_events.extend(round_fee_events)
 
-    refunds = compute_sender_refund(sender_address, fee_events, transaction_budget)
+    refunds = compute_sender_refund(
+        sender_address, fee_events, transaction_budget, labels
+    )
     fee_events.append(
         FeeEvent(
             sequence_id=event_sequence.next_id(),
