@@ -138,21 +138,21 @@ def classify_vote_appeal(
     round_index: int, rounds: List[Dict[str, Vote]], prev_majority: str
 ) -> RoundLabel:
     """Classify an appeal based on vote majorities."""
-    # If this is the last round, assume unsuccessful
-    if round_index + 1 >= len(rounds):
-        if prev_majority in ["UNDETERMINED", "DISAGREE"]:
-            return "APPEAL_LEADER_UNSUCCESSFUL"
-        else:
-            return "APPEAL_VALIDATOR_UNSUCCESSFUL"
-
     # Get appeal round majority
     appeal_votes = rounds[round_index]
     appeal_majority = compute_majority(appeal_votes) if appeal_votes else "UNDETERMINED"
 
     # Leader appeal: previous round had no clear majority
     if prev_majority in ["UNDETERMINED", "DISAGREE"]:
+        # If this is the last round, check if appeal reached a clear majority
+        if round_index + 1 >= len(rounds):
+            if appeal_majority not in ["UNDETERMINED", "DISAGREE"]:
+                return "APPEAL_LEADER_SUCCESSFUL"
+            else:
+                return "APPEAL_LEADER_UNSUCCESSFUL"
+        
+        # Otherwise check next round
         next_majority = compute_majority(rounds[round_index + 1])
-
         if next_majority not in ["UNDETERMINED", "DISAGREE"]:
             return "APPEAL_LEADER_SUCCESSFUL"
         else:

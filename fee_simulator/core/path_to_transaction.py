@@ -30,8 +30,21 @@ def create_majority_agree_votes(size: int, addresses: List[str], offset: int = 0
     votes = {
         addresses[offset]: ["LEADER_RECEIPT", "AGREE"],  # Leader
     }
-    for i in range(1, size):
+    
+    # Calculate majority threshold (more than half)
+    majority_count = (size // 2) + 1
+    
+    # First majority_count-1 validators agree (we already have leader agreeing)
+    for i in range(1, majority_count):
         votes[addresses[offset + i]] = "AGREE"
+    
+    # Rest of validators split between DISAGREE and TIMEOUT
+    for i in range(majority_count, size):
+        if (i - majority_count) % 2 == 0:
+            votes[addresses[offset + i]] = "DISAGREE"
+        else:
+            votes[addresses[offset + i]] = "TIMEOUT"
+    
     return votes
 
 
@@ -40,8 +53,21 @@ def create_majority_disagree_votes(size: int, addresses: List[str], offset: int 
     votes = {
         addresses[offset]: ["LEADER_RECEIPT", "DISAGREE"],  # Leader
     }
-    for i in range(1, size):
+    
+    # Calculate majority threshold (more than half)
+    majority_count = (size // 2) + 1
+    
+    # First majority_count-1 validators disagree (we already have leader disagreeing)
+    for i in range(1, majority_count):
         votes[addresses[offset + i]] = "DISAGREE"
+    
+    # Rest of validators split between AGREE and TIMEOUT
+    for i in range(majority_count, size):
+        if (i - majority_count) % 2 == 0:
+            votes[addresses[offset + i]] = "AGREE"
+        else:
+            votes[addresses[offset + i]] = "TIMEOUT"
+    
     return votes
 
 
@@ -50,8 +76,21 @@ def create_majority_timeout_votes(size: int, addresses: List[str], offset: int =
     votes = {
         addresses[offset]: ["LEADER_RECEIPT", "TIMEOUT"],  # Leader
     }
-    for i in range(1, size):
+    
+    # Calculate majority threshold (more than half)
+    majority_count = (size // 2) + 1
+    
+    # First majority_count-1 validators timeout (we already have leader timing out)
+    for i in range(1, majority_count):
         votes[addresses[offset + i]] = "TIMEOUT"
+    
+    # Rest of validators split between AGREE and DISAGREE
+    for i in range(majority_count, size):
+        if (i - majority_count) % 2 == 0:
+            votes[addresses[offset + i]] = "AGREE"
+        else:
+            votes[addresses[offset + i]] = "DISAGREE"
+    
     return votes
 
 
@@ -121,12 +160,22 @@ def create_appeal_votes(node: str, size: int, addresses: List[str], offset: int 
         # No new leader receipt - validators vote on the appeal
         # First address (leader from previous round) votes like a validator
         if "SUCCESSFUL" in node:
-            # Successful appeal - majority supports the appeal
-            for i in range(size):
+            # Successful appeal - majority DISAGREES with original decision
+            # Create a majority that disagrees
+            majority_count = (size // 2) + 1
+            for i in range(majority_count):
+                votes[addresses[offset + i]] = "DISAGREE"
+            # Rest vote AGREE (supporting original decision)
+            for i in range(majority_count, size):
                 votes[addresses[offset + i]] = "AGREE"
         else:
-            # Unsuccessful appeal - majority rejects the appeal
-            for i in range(size):
+            # Unsuccessful appeal - majority AGREES with original decision
+            # Create a majority that agrees
+            majority_count = (size // 2) + 1
+            for i in range(majority_count):
+                votes[addresses[offset + i]] = "AGREE"
+            # Rest vote DISAGREE (opposing original decision)
+            for i in range(majority_count, size):
                 votes[addresses[offset + i]] = "DISAGREE"
     
     return votes
@@ -219,11 +268,15 @@ def path_to_transaction_results(
             normal_count += 1
     
     # Create budget based on path
+    # Count normal rounds (non-appeal rounds)
+    normal_round_count = len(rounds) - appeal_count
+    
+    # Rotations are indexed by normal round number, so we need one per normal round
     budget = TransactionBudget(
         leaderTimeout=leader_timeout,
         validatorsTimeout=validators_timeout,
         appealRounds=appeal_count,
-        rotations=[0] * len(rounds),  # One rotation per round
+        rotations=[0] * normal_round_count,
         senderAddress=sender_address,
         appeals=appeals,
         staking_distribution="constant"

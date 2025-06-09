@@ -47,10 +47,9 @@ def check_conservation_of_value(
     round_labels: List[RoundLabel],
     tolerance: int = 1
 ) -> None:
-    """Invariant 1: Total costs = total earnings + total burns + refunds"""
+    """Invariant 1: Total costs = total earnings + refunds"""
     total_costs = compute_agg_costs(fee_events)
     total_earnings = compute_agg_earnings(fee_events)
-    total_burns = compute_agg_burnt(fee_events)
     
     # Calculate refund
     sender_refund = compute_sender_refund(
@@ -60,13 +59,13 @@ def check_conservation_of_value(
         round_labels
     )
     
-    expected = total_earnings + total_burns + sender_refund
+    expected = total_earnings + sender_refund
     
     if abs(total_costs - expected) > tolerance:
         raise InvariantViolation(
             "conservation_of_value",
             f"Total costs ({total_costs}) != earnings ({total_earnings}) + "
-            f"burns ({total_burns}) + refund ({sender_refund}). "
+            f"refund ({sender_refund}). "
             f"Difference: {total_costs - expected}"
         )
 
