@@ -24,17 +24,18 @@ from fee_simulator.core.round_fee_distribution import (
 )
 
 FeeTransformer = Callable[
-    [TransactionRoundResults, int, TransactionBudget, EventSequence], List[FeeEvent]
+    [TransactionRoundResults, int, TransactionBudget, EventSequence, List[RoundLabel]],
+    List[FeeEvent],
 ]
 
 FEE_RULES: Dict[RoundLabel, FeeTransformer] = {
     "NORMAL_ROUND": apply_normal_round,
-    "EMPTY_ROUND": lambda r, i, b, s: [],
-    "SKIP_ROUND": lambda r, i, b, s: [],
-    "APPEAL_LEADER_TIMEOUT_UNSUCCESSFUL": lambda r, i, b, s: [],
+    "EMPTY_ROUND": lambda r, i, b, s, l: [],
+    "SKIP_ROUND": lambda r, i, b, s, l: [],
+    "APPEAL_LEADER_TIMEOUT_UNSUCCESSFUL": lambda r, i, b, s, l: [],
     "APPEAL_LEADER_TIMEOUT_SUCCESSFUL": apply_appeal_leader_timeout_successful,
     "APPEAL_LEADER_SUCCESSFUL": apply_appeal_leader_successful,
-    "APPEAL_LEADER_UNSUCCESSFUL": lambda r, i, b, s: [],
+    "APPEAL_LEADER_UNSUCCESSFUL": lambda r, i, b, s, l: [],
     "APPEAL_VALIDATOR_SUCCESSFUL": apply_appeal_validator_successful,
     "APPEAL_VALIDATOR_UNSUCCESSFUL": apply_appeal_validator_unsuccessful,
     "LEADER_TIMEOUT_50_PERCENT": apply_leader_timeout_50_percent,
@@ -50,9 +51,12 @@ def distribute_round(
     label: RoundLabel,
     budget: TransactionBudget,
     event_sequence: EventSequence,
+    round_labels: List[RoundLabel],
 ) -> List[FeeEvent]:
     """
     Distribute fees for a single round based on its label, generating FeeEvent instances.
     """
-    transformer = FEE_RULES.get(label, lambda r, i, b, s: [])
-    return transformer(transaction_results, round_index, budget, event_sequence)
+    transformer = FEE_RULES.get(label, lambda r, i, b, s, l: [])
+    return transformer(
+        transaction_results, round_index, budget, event_sequence, round_labels
+    )

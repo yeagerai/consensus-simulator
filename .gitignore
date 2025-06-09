@@ -1,2 +1,6 @@
 __pycache__/
 *.pyc
+test_results/
+checkpoints/
+.hypothesis/
+.claude/memory/

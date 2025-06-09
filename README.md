@@ -2,89 +2,105 @@
 
 ## Overview
 
-The GenLayer Fee Distribution Simulator is a Python-based tool designed to model and analyze the fee distribution mechanics of a blockchain validator network, specifically for the GenLayer protocol. It simulates how transaction fees are allocated among participants (leaders, validators, senders, and appealants) based on their roles, voting behavior, and consensus outcomes. The simulator supports a variety of scenarios, including normal rounds, leader and validator appeals, timeouts, and penalties for non-compliance, providing insights into the economic incentives of the network.
+The GenLayer Fee Distribution Simulator is a comprehensive Python-based system for modeling and testing fee distribution mechanisms in the GenLayer blockchain validator network. It uses a path-based approach to exhaustively test all possible transaction scenarios, ensuring correctness through rigorous invariant checking.
+
+The simulator follows a deterministic flow: **TRANSITIONS_GRAPH → Path → TransactionRoundResults → Round Labels → Fee Distribution**, where each step is purely functional and content-based rather than index-based.
 
 ## Key Features
 
-- **Role-Based Fee Distribution**: Allocates fees to participants based on their roles (Leader, Validator, Sender, Appealant).
-- **Consensus-Driven Rewards and Penalties**: Rewards majority voters and penalizes minority or idle participants.
-- **Appeal Mechanisms**: Simulates successful and unsuccessful appeals with appeal bond calculations.
-- **Comprehensive Testing Suite**: Includes unit tests, scenario-based tests, and edge-case validation.
-- **Visualization Tools**: Provides formatted tables for transaction results, fee distributions, and summary statistics.
-- **Modular Design**: Organized into core logic, display utilities, and testing modules for easy extension.
+- **Path-Based Testing**: Generates all valid transaction paths from TRANSITIONS_GRAPH for exhaustive testing
+- **Content-Based Round Detection**: Identifies round types by analyzing vote patterns, not indices
+- **22 Invariants**: Comprehensive invariant checking ensures correctness (conservation of value, non-negative balances, etc.)
+- **Role-Based Fee Distribution**: Allocates fees based on participant roles (Leader, Validator, Sender, Appealant)
+- **Appeal Mechanisms**: Handles leader and validator appeals with proper bond calculations
+- **Special Pattern Recognition**: Automatically transforms round labels based on transaction patterns
+- **Visualization Tools**: Rich formatted tables for transaction results and fee distributions
+- **Modular Architecture**: Clean separation between path generation, transaction processing, and fee distribution
 
 ## Project Structure
 
-The project is organized into the following key directories and files:
+```
+fee_simulator/
+├── core/                     # Core logic
+│   ├── round_fee_distribution/  # Fee distribution strategies
+│   │   ├── normal_round.py
+│   │   ├── appeal_*_successful.py
+│   │   ├── appeal_*_unsuccessful.py
+│   │   ├── leader_timeout_*.py
+│   │   └── split_previous_appeal_bond.py
+│   ├── path_to_transaction.py   # Path → Transaction converter
+│   ├── round_labeling.py        # Content-based round type detection
+│   ├── transaction_processing.py # Main processing pipeline
+│   ├── bond_computing.py        # Appeal bond calculations
+│   ├── majority.py              # Vote outcome determination
+│   └── refunds.py               # Sender refund logic
+├── models.py                 # Data structures (immutable)
+├── constants.py              # NORMAL_ROUND_SIZES, APPEAL_ROUND_SIZES
+├── types.py                  # Type definitions
+└── display/                  # Visualization utilities
 
-- **fee_simulator/**
-    - **core/**: Core logic for fee distribution and transaction processing.
-        - `round_fee_distribution/*.py`: Implements fee distribution rules for various round types (e.g., normal rounds, appeals, timeouts).
-        - `bond_computing.py`: Calculates appeal bonds based on round indices and timeouts.
-        - `burns.py`: Computes burn amounts for unsuccessful appeals.
-        - `deterministic_violation.py`: Handles slashing for hash mismatches.
-        - `idleness.py`: Manages idle validator slashing and reserve replacements.
-        - `majority.py`: Determines vote and hash majorities.
-        - `refunds.py`: Calculates sender refunds.
-        - `round_labeling.py`: Labels rounds based on voting patterns and context.
-        - `transaction_processing.py`: Orchestrates the fee distribution process.
-    - **display/**: Visualization utilities for formatted output.
-        - `fee_distribution.py`: Displays detailed fee event tables.
-        - `summary_table.py`: Shows summarized fee distributions and round labels.
-        - `transaction_results.py`: Visualizes round and rotation details.
-        - `utils.py`: Formatting helpers for colored output and table creation.
-    - **fee_aggregators/**: Aggregates financial metrics per address.
-        - `address_metrics.py`: Computes costs, earnings, burns, and stakes.
-    - `constants.py`: Defines constants like round sizes and penalty coefficients.
-    - `models.py`: Pydantic models for data validation (e.g., FeeEvent, TransactionBudget).
-    - `types.py`: Type definitions for votes, roles, and round labels.
-    - `utils.py`: Utility functions for address generation and stake initialization.
-- **tests/**: Comprehensive test suite.
-    - `budget_and_refunds/*.py`: Tests for budget calculations and refunds.
-    - `round_types_tests/*.py`: Scenario-based tests for various round types.
-    - `slashing/*.py`: Tests for slashing mechanisms (e.g., idleness, violations).
-    - `conftest.py`: Pytest configuration for verbose/debug output.
+tests/
+├── round_combinations/       # Path generation from TRANSITIONS_GRAPH
+│   ├── graph_data.py        # The source of truth graph
+│   └── generate_paths.py    # Path generation logic
+├── round_labeling/          # Round detection tests
+├── fee_distributions/       # Fee distribution tests
+│   ├── simple_round_types_tests/
+│   └── check_invariants/    # 22 invariant implementations
+└── invariant_checks.py      # Invariant verification
+```
 - `requirements.txt`: Lists project dependencies.
 
 ## How It Works
 
-### Core Components
+### Processing Pipeline
 
-1. **Rounds and Rotations**:
-    
-    - A transaction consists of one or more rounds, each containing rotations.
-    - Rotations hold votes from validators and leaders, influencing fee distribution.
-2. **Vote Types**:
-    
-    - `AGREE`, `DISAGREE`, `TIMEOUT`, `IDLE`: Validator votes.
-    - `LEADER_RECEIPT`, `LEADER_TIMEOUT`: Leader-specific actions.
-    - Votes may include hashes for validation.
-3. **Round Types**:
-    
-    - `NORMAL_ROUND`: Standard validation round.
-    - `APPEAL_LEADER_SUCCESSFUL/UNSUCCESSFUL`: Leader appeal outcomes.
-    - `APPEAL_VALIDATOR_SUCCESSFUL/UNSUCCESSFUL`: Validator appeal outcomes.
-    - `LEADER_TIMEOUT_50_PERCENT`, `LEADER_TIMEOUT_150_PREVIOUS_NORMAL_ROUND`, etc.: Timeout scenarios.
-    - `SPLIT_PREVIOUS_APPEAL_BOND`: Distributes prior appeal bonds.
-4. **Fee Distribution Process**:
-    
-    - **Initialization**: Stakes are assigned to participants.
-    - **Idle Handling**: Idle validators are slashed and replaced by reserves.
-    - **Violation Handling**: Validators with mismatched hashes are slashed.
-    - **Round Labeling**: Rounds are labeled based on votes and context.
-    - **Fee Allocation**: Fees are distributed per round label, rewarding majority voters and penalizing others.
-    - **Refunds**: Senders receive refunds for overpaid fees.
+```
+1. TRANSITIONS_GRAPH defines valid state transitions
+   ↓
+2. Path Generator creates sequences like:
+   ["START", "LEADER_RECEIPT_MAJORITY_AGREE", "APPEAL_VALIDATOR_SUCCESSFUL", "END"]
+   ↓
+3. Path-to-Transaction converter creates TransactionRoundResults with appropriate votes
+   ↓
+4. Round Labeling analyzes vote patterns (content-based, not index-based):
+   - All NA votes → Leader Appeal
+   - LEADER_TIMEOUT → Leader Timeout
+   - AGREE/DISAGREE without leader → Validator Appeal
+   ↓
+5. Fee Distribution based on labels:
+   - NORMAL_ROUND → Leader and majority validators earn
+   - APPEAL_*_SUCCESSFUL → Appealant earns bond
+   - Special patterns trigger transformations
+   ↓
+6. Invariant Checking ensures correctness
+```
 
-### Example Workflow
+### Round Type Detection
 
-1. A transaction is defined with a `TransactionBudget` (leader/validator timeouts, sender, appeals) and `TransactionRoundResults` (rounds and votes).
-2. The `process_transaction` function:
-    - Initializes stakes.
-    - Subtracts the total cost from the sender.
-    - Handles idle validators and violations.
-    - Labels rounds and distributes fees.
-    - Computes and applies sender refunds.
-3. Results are visualized using `display_summary_table`, `display_fee_distribution`, and `display_transaction_results`.
+Rounds are identified by their vote patterns, not their position:
+
+- **Leader Appeals**: All participants vote "NA"
+- **Validator Appeals**: No LEADER_RECEIPT, validators vote AGREE/DISAGREE
+- **Normal Rounds**: Have LEADER_RECEIPT or LEADER_TIMEOUT
+- **Special Patterns**: e.g., successful appeal makes previous round SKIP_ROUND
+
+### Key Concepts
+
+1. **Vote Types**:
+   - `LEADER_RECEIPT`: Leader submitted result
+   - `LEADER_TIMEOUT`: Leader failed to respond
+   - `AGREE`/`DISAGREE`/`TIMEOUT`: Validator votes
+   - `NA`: Not applicable (appeals)
+
+2. **Round Sizes**:
+   - Normal rounds: [5, 11, 23, 47, 95, 191, 383, 767, 1000]
+   - Appeal rounds: [7, 13, 25, 49, 97, 193, 385, 769, 1000]
+
+3. **Fee Distribution**:
+   - Leader earns: leader_timeout + validator_timeout (if majority)
+   - Validators earn: validator_timeout (if in majority)
+   - Penalties: PENALTY_REWARD_COEFFICIENT * validator_timeout
 
 ## Installation
 

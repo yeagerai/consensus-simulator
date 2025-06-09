@@ -1,10 +1,10 @@
 from typing import List
-from math import floor
 from fee_simulator.models import (
     TransactionRoundResults,
     TransactionBudget,
     FeeEvent,
     EventSequence,
+    RoundLabel,
 )
 from fee_simulator.core.majority import (
     compute_majority,
@@ -13,6 +13,7 @@ from fee_simulator.core.majority import (
 )
 from fee_simulator.core.bond_computing import compute_appeal_bond
 from fee_simulator.constants import PENALTY_REWARD_COEFFICIENT
+from fee_simulator.utils import is_appeal_round
 
 
 def apply_appeal_validator_successful(
@@ -20,17 +21,33 @@ def apply_appeal_validator_successful(
     round_index: int,
     budget: TransactionBudget,
     event_sequence: EventSequence,
+    round_labels: List[RoundLabel],
 ) -> List[FeeEvent]:
     events = []
     round = transaction_results.rounds[round_index]
-    if not budget.appeals or round_index > len(budget.appeals):
-        return events
-    appeal = budget.appeals[floor(round_index / 2)]
+    
+    # Find which appeal this is by counting appeals up to this point
+    appeal_count = sum(1 for i in range(round_index + 1) if is_appeal_round(round_labels[i]))
+    appeal_index = appeal_count - 1
+    
+    if appeal_index < 0 or appeal_index >= len(budget.appeals):
+        raise ValueError(f"Appeal index {appeal_index} out of bounds for round {round_index}")
+    
+    appeal = budget.appeals[appeal_index]
     appealant_address = appeal.appealantAddress
+    
+    # Find the most recent normal round before this appeal
+    normal_round_index = round_index - 1  # Default
+    for i in range(round_index - 1, -1, -1):
+        if not is_appeal_round(round_labels[i]):
+            normal_round_index = i
+            break
+    
     appeal_bond = compute_appeal_bond(
-        normal_round_index=round_index - 1,
+        normal_round_index=normal_round_index,
         leader_timeout=budget.leaderTimeout,
         validators_timeout=budget.validatorsTimeout,
+        round_labels=round_labels,
     )
     events.append(
         FeeEvent(

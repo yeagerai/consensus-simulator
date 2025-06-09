@@ -22,7 +22,7 @@ from fee_simulator.display import (
     display_summary_table,
     display_test_description,
 )
-from tests.invariant_checks import check_invariants
+from tests.fee_distributions.check_invariants.invariant_checks import check_invariants
 
 leaderTimeout = 100
 validatorsTimeout = 200
@@ -100,15 +100,15 @@ def test_appeal_leader_successful(verbose):
         display_transaction_results(transaction_results, round_labels)
         display_fee_distribution(fee_events)
 
-    # Invariant Check
-    check_invariants(fee_events, transaction_budget, transaction_results)
-
     # Round Label Assert
     assert round_labels == [
         "SKIP_ROUND",
         "APPEAL_LEADER_SUCCESSFUL",
         "NORMAL_ROUND",
     ], f"Expected ['SKIP_ROUND', 'APPEAL_LEADER_SUCCESSFUL', 'NORMAL_ROUND'], got {round_labels}"
+
+    # Invariant Check
+    check_invariants(fee_events, transaction_budget, transaction_results)
 
     # Everyone Else 0 Fees Assert
     assert all(
@@ -119,7 +119,7 @@ def test_appeal_leader_successful(verbose):
 
     # Appealant Fees Assert
     appeal_bond = compute_appeal_bond(
-        0, leaderTimeout, validatorsTimeout
+        0, leaderTimeout, validatorsTimeout, round_labels
     )  # Computed as per compute_appeal_bond for round_index=0
     assert (
         compute_total_earnings(fee_events, addresses_pool[23])
