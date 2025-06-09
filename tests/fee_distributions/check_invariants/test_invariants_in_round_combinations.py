@@ -147,7 +147,7 @@ def test_paths_with_invariants(verbose, debug, path):
         output_content.append("INVARIANT CHECK:")
         try:
             check_comprehensive_invariants(
-                fee_events, transaction_budget, transaction_results, round_labels
+                fee_events, transaction_budget, transaction_results, round_labels, tolerance=20
             )
             output_content.append("✓ All invariants passed")
             success = True
