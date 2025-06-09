@@ -181,7 +181,7 @@ class TestRoundLabelingProperties:
                 assert labels[0] == "EMPTY_ROUND"
 
     def test_appeal_positioning_property(self):
-        """Property: Appeals at odd indices get appeal labels."""
+        """Property: Appeals are correctly detected by vote patterns."""
         # Create specific structure with appeals
         for num_appeals in range(1, 4):
             rounds = []
@@ -222,13 +222,15 @@ class TestRoundLabelingProperties:
             transaction_results = TransactionRoundResults(rounds=rounds)
             labels = label_rounds(transaction_results)
 
-            # Check appeal positioning
-            for i, label in enumerate(labels):
-                if i % 2 == 1 and i < len(labels) - 1:  # Odd index, not last
-                    assert "APPEAL" in label or label in [
+            # Check that rounds with NA votes are detected as appeals
+            for i, round_obj in enumerate(rounds):
+                votes = round_obj.rotations[0].votes if round_obj.rotations else {}
+                if votes and all(v == "NA" or (isinstance(v, list) and v[1] == "NA") for v in votes.values()):
+                    # This round has all NA votes, should be labeled as appeal
+                    assert "APPEAL" in labels[i] or labels[i] in [
                         "SPLIT_PREVIOUS_APPEAL_BOND",
                         "LEADER_TIMEOUT_50_PREVIOUS_APPEAL_BOND",
-                    ], f"Expected appeal-related label at index {i}, got {label}"
+                    ], f"Expected appeal-related label for round {i} with NA votes, got {labels[i]}"
 
     @given(st.integers(min_value=2, max_value=5))
     @settings(max_examples=50, deadline=None)
@@ -303,8 +305,8 @@ class TestRoundLabelingInvariantsExtended:
     """Extended invariant tests with more complex scenarios."""
 
     def test_no_consecutive_appeals_at_even_indices(self):
-        """Invariant: No two consecutive even-indexed rounds can both be appeals."""
-        # This tests our understanding that appeals should be at odd indices
+        """Invariant: Special patterns prevent consecutive appeals at even indices."""
+        # This tests that our special pattern handling transforms appeal sequences correctly
         test_cases = []
 
         # Generate various round sequences
@@ -458,9 +460,10 @@ class TestRoundLabelingInvariantsExtended:
 def test_mathematical_properties():
     """Test mathematical properties of round labeling."""
 
-    # Property 1: Number of appeal labels <= number of odd-indexed rounds
+    # Property 1: Number of appeal labels matches number of rounds with appeal characteristics
     for num_rounds in range(1, 10):
         rounds = []
+        appeal_round_count = 0
         for i in range(num_rounds):
             if i % 2 == 0:
                 votes = {
@@ -469,16 +472,19 @@ def test_mathematical_properties():
                 }
             else:
                 votes = {ADDR_POOL[0]: "NA"}
+                appeal_round_count += 1
 
             rounds.append(Round(rotations=[Rotation(votes=votes)]))
 
         transaction_results = TransactionRoundResults(rounds=rounds)
         labels = label_rounds(transaction_results)
 
-        appeal_labels = sum(1 for label in labels if "APPEAL" in label)
-        odd_rounds = sum(1 for i in range(num_rounds) if i % 2 == 1)
-
-        assert appeal_labels <= odd_rounds
+        appeal_labels = sum(1 for label in labels if "APPEAL" in label and label not in [
+            "SPLIT_PREVIOUS_APPEAL_BOND", "LEADER_TIMEOUT_50_PREVIOUS_APPEAL_BOND"
+        ])
+        
+        # Appeal labels should correspond to rounds with appeal characteristics (NA votes)
+        assert appeal_labels <= appeal_round_count
 
     # Property 2: Special case transformations preserve round count
     test_results = TransactionRoundResults(

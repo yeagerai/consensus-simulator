@@ -12,6 +12,8 @@ from fee_simulator.models import (
 from fee_simulator.constants import (
     ROUND_SIZES,
     DEFAULT_STAKE,
+    NORMAL_ROUND_SIZES,
+    APPEAL_ROUND_SIZES,
 )
 from fee_simulator.types import RoundLabel
 
@@ -42,20 +44,31 @@ def compute_total_cost(transaction_budget: TransactionBudget) -> int:
     max_appealant_reward = (
         transaction_budget.appealRounds * transaction_budget.leaderTimeout
     )
-    num_rounds = transaction_budget.appealRounds * 2 + 1
-    for i in range(num_rounds):
-        if i % 2 == 0:
-            max_round_price += (
-                ROUND_SIZES[i]
-                * (transaction_budget.rotations[i // 2] + 1)
-                * transaction_budget.validatorsTimeout
-                + transaction_budget.leaderTimeout
-            )
-        else:
-            max_round_price += (
-                ROUND_SIZES[i] * transaction_budget.validatorsTimeout
-                + transaction_budget.leaderTimeout
-            )
+    
+    # Calculate costs for normal rounds
+    # Number of normal rounds = number of appeal rounds + 1 (assuming alternating pattern)
+    num_normal_rounds = transaction_budget.appealRounds + 1
+    for i in range(num_normal_rounds):
+        # Get the size from NORMAL_ROUND_SIZES
+        round_size = NORMAL_ROUND_SIZES[i] if i < len(NORMAL_ROUND_SIZES) else NORMAL_ROUND_SIZES[-1]
+        # Get the number of rotations for this normal round
+        rotation_count = transaction_budget.rotations[i] if i < len(transaction_budget.rotations) else 0
+        max_round_price += (
+            round_size
+            * (rotation_count + 1)
+            * transaction_budget.validatorsTimeout
+            + transaction_budget.leaderTimeout
+        )
+    
+    # Calculate costs for appeal rounds
+    for i in range(transaction_budget.appealRounds):
+        # Get the size from APPEAL_ROUND_SIZES
+        round_size = APPEAL_ROUND_SIZES[i] if i < len(APPEAL_ROUND_SIZES) else APPEAL_ROUND_SIZES[-1]
+        max_round_price += (
+            round_size * transaction_budget.validatorsTimeout
+            + transaction_budget.leaderTimeout
+        )
+    
     total_cost = max_appealant_reward + max_round_price
     return total_cost
 
@@ -84,6 +97,10 @@ def split_amount(amount: int, num_recipients: int, decimals: int = 18) -> int:
 
 
 def compute_round_size_indices(round_types: List[RoundLabel]) -> List[int]:
+    """
+    DEPRECATED: This function is kept for backward compatibility.
+    Use get_round_size() with the new split structure instead.
+    """
     if not round_types:
         return []
 
@@ -110,20 +127,45 @@ def compute_round_size_indices(round_types: List[RoundLabel]) -> List[int]:
 
 
 def get_round_size(round_index: int, round_types: List[RoundLabel]) -> int:
-    indices = compute_round_size_indices(round_types)
-
-    if round_index >= len(indices):
+    """
+    Get the size of a round based on its index and type.
+    
+    With the new split structure, this is much simpler:
+    - Count how many normal rounds came before this one
+    - Count how many appeal rounds came before this one
+    - Use the appropriate list (NORMAL_ROUND_SIZES or APPEAL_ROUND_SIZES)
+    """
+    if round_index >= len(round_types):
         raise IndexError(
             f"Round index {round_index} out of bounds for {len(round_types)} rounds"
         )
-
-    size_index = indices[round_index]
-
-    if size_index >= len(ROUND_SIZES):
-        # Handle case where we've exhausted predefined sizes
-        return ROUND_SIZES[-1]  # Use the largest available size
-
-    return ROUND_SIZES[size_index]
+    
+    # Count normal and appeal rounds up to this index
+    normal_count = 0
+    appeal_count = 0
+    
+    for i in range(round_index + 1):
+        if i < len(round_types):
+            if is_appeal_round(round_types[i]):
+                appeal_count += 1
+            else:
+                normal_count += 1
+    
+    # Get the size based on the round type
+    if is_appeal_round(round_types[round_index]):
+        # This is an appeal round
+        appeal_index = appeal_count - 1  # 0-based index
+        if appeal_index < len(APPEAL_ROUND_SIZES):
+            return APPEAL_ROUND_SIZES[appeal_index]
+        else:
+            return APPEAL_ROUND_SIZES[-1]  # Use the last size for rounds beyond the list
+    else:
+        # This is a normal round
+        normal_index = normal_count - 1  # 0-based index
+        if normal_index < len(NORMAL_ROUND_SIZES):
+            return NORMAL_ROUND_SIZES[normal_index]
+        else:
+            return NORMAL_ROUND_SIZES[-1]  # Use the last size for rounds beyond the list
 
 
 def is_appeal_round(round_label: RoundLabel) -> bool:

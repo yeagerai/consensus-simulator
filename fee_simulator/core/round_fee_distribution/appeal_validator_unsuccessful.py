@@ -1,5 +1,4 @@
 from typing import List
-from math import floor
 from fee_simulator.models import (
     TransactionRoundResults,
     TransactionBudget,
@@ -14,6 +13,7 @@ from fee_simulator.core.majority import (
 )
 from fee_simulator.core.burns import compute_unsuccessful_validator_appeal_burn
 from fee_simulator.constants import PENALTY_REWARD_COEFFICIENT
+from fee_simulator.utils import is_appeal_round
 
 
 def apply_appeal_validator_unsuccessful(
@@ -25,7 +25,15 @@ def apply_appeal_validator_unsuccessful(
 ) -> List[FeeEvent]:
     events = []
     round = transaction_results.rounds[round_index]
-    appeal = budget.appeals[floor(round_index / 2)]
+    
+    # Find which appeal this is by counting appeals up to this point
+    appeal_count = sum(1 for i in range(round_index + 1) if is_appeal_round(round_labels[i]))
+    appeal_index = appeal_count - 1
+    
+    if appeal_index < 0 or appeal_index >= len(budget.appeals):
+        raise ValueError(f"Appeal index {appeal_index} out of bounds for round {round_index}")
+    
+    appeal = budget.appeals[appeal_index]
     appealant_address = appeal.appealantAddress
     if round.rotations:
         votes = round.rotations[-1].votes

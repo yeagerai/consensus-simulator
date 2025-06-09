@@ -248,13 +248,19 @@ class RoundLabelingInvariants:
                 label in valid_labels
             ), f"Invalid label '{label}' at index {i} for path {path}"
 
-        # Appeals must be at odd indices (except special cases)
+        # Appeal labels must correspond to rounds with appeal characteristics
         for i, label in enumerate(labels):
             if "APPEAL" in label and label not in [
                 "SPLIT_PREVIOUS_APPEAL_BOND",
                 "LEADER_TIMEOUT_50_PREVIOUS_APPEAL_BOND",
             ]:
-                assert i % 2 == 1, f"Appeal '{label}' at even index {i} for path {path}"
+                # Verify the round has appeal characteristics
+                round_obj = transaction_results.rounds[i]
+                if round_obj.rotations:
+                    votes = round_obj.rotations[-1].votes
+                    has_na_votes = any(v == "NA" or (isinstance(v, list) and "NA" in v) for v in votes.values())
+                    has_leader_receipt = any(isinstance(v, list) and v[0] == "LEADER_RECEIPT" for v in votes.values())
+                    assert has_na_votes or not has_leader_receipt, f"Appeal '{label}' at index {i} but round doesn't have appeal characteristics for path {path}"
 
 
 # Test Classes with Markers

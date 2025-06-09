@@ -8,6 +8,7 @@ from fee_simulator.models import (
 )
 from fee_simulator.core.majority import normalize_vote
 from fee_simulator.core.bond_computing import compute_appeal_bond
+from fee_simulator.utils import is_appeal_round
 
 
 def apply_leader_timeout_50_previous_appeal_bond(
@@ -29,8 +30,17 @@ def apply_leader_timeout_50_previous_appeal_bond(
 
     votes = round.rotations[-1].votes
     sender_address = budget.senderAddress
+    
+    # Find the most recent normal round before the previous round
+    # This is used to compute the appeal bond from the previous appeal
+    normal_round_index = round_index - 2  # Default
+    for i in range(round_index - 1, -1, -1):
+        if not is_appeal_round(round_labels[i]):
+            normal_round_index = i
+            break
+    
     appeal_bond = compute_appeal_bond(
-        round_index - 2,
+        normal_round_index,
         budget.leaderTimeout,
         budget.validatorsTimeout,
         round_labels=round_labels,

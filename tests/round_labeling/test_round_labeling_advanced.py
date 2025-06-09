@@ -404,7 +404,7 @@ class ValidLabelsInvariant(Invariant):
 
 
 class AppealPositionInvariant(Invariant):
-    """Appeals occur at correct positions."""
+    """Appeals are correctly identified based on round content."""
 
     def check(
         self,
@@ -414,13 +414,20 @@ class AppealPositionInvariant(Invariant):
     ) -> Result[bool]:
         for i, label in enumerate(labels):
             if self._is_appeal_label(label):
-                if i % 2 == 0:  # Even index
-                    # Check if this is a special case
-                    if not self._is_special_case(i, labels, path):
-                        return Result(
-                            value=False,
-                            error=f"Appeal label '{label}' at even index {i} without special case",
-                        )
+                # Check that the round has appeal characteristics
+                if i < len(transaction.rounds):
+                    round_obj = transaction.rounds[i]
+                    if round_obj.rotations:
+                        votes = round_obj.rotations[-1].votes
+                        # Appeal rounds should have NA votes or no leader receipt
+                        has_na_votes = any(v == "NA" or (isinstance(v, list) and "NA" in v) for v in votes.values())
+                        has_leader_receipt = any(isinstance(v, list) and v[0] == "LEADER_RECEIPT" for v in votes.values())
+                        
+                        if not has_na_votes and has_leader_receipt:
+                            return Result(
+                                value=False,
+                                error=f"Appeal label '{label}' at index {i} but round has leader receipt and no NA votes",
+                            )
         return Result(value=True, error=None)
 
     def _is_appeal_label(self, label: str) -> bool:
@@ -429,11 +436,6 @@ class AppealPositionInvariant(Invariant):
             "SPLIT_PREVIOUS_APPEAL_BOND",
             "LEADER_TIMEOUT_50_PREVIOUS_APPEAL_BOND",
         ]
-
-    def _is_special_case(self, index: int, labels: List[str], path: PathType) -> bool:
-        """Check if this is a special case where appeal at even index is OK."""
-        # Could be part of a pattern transformation
-        return True  # Simplified for now
 
     @property
     def name(self) -> str:

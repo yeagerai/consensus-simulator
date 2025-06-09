@@ -84,8 +84,14 @@ def process_transaction(
                     appealant_address = transaction_budget.appeals[
                         appeal_index
                     ].appealantAddress
+                    # Find the most recent normal round before this appeal
+                    normal_round_index = i - 1  # Default to previous round
+                    for j in range(i - 1, -1, -1):
+                        if not is_appeal_round(labels[j]):
+                            normal_round_index = j
+                            break
                     bond = compute_appeal_bond(
-                        normal_round_index=i - 1,
+                        normal_round_index=normal_round_index,
                         leader_timeout=transaction_budget.leaderTimeout,
                         validators_timeout=transaction_budget.validatorsTimeout,
                         round_labels=labels,  # Pass labels

@@ -1,4 +1,5 @@
-from fee_simulator.utils import get_round_size, is_appeal_round
+from fee_simulator.utils import is_appeal_round
+from fee_simulator.utils_round_sizes import get_round_size_for_bond
 from fee_simulator.types import RoundLabel
 from typing import List
 
@@ -27,8 +28,8 @@ def compute_appeal_bond(
     if not is_appeal_round(round_labels[appeal_round_index]):
         raise ValueError(f"Round {appeal_round_index} is not an appeal round")
 
-    # Get the size of the appeal round itself
-    appeal_round_size = get_round_size(appeal_round_index, round_labels)
+    # Get the size of the appeal round using the new utility
+    appeal_round_size = get_round_size_for_bond(appeal_round_index, round_labels)
 
     # Bond covers the cost of the appeal round
     appeal_cost = appeal_round_size * validators_timeout

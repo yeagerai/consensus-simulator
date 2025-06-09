@@ -3,4 +3,4 @@ __pycache__/
 test_results/
 checkpoints/
 .hypothesis/
-CLAUDE.md
+.claude/memory/

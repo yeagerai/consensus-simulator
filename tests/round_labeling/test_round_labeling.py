@@ -2,7 +2,6 @@ import pytest
 from typing import List, Dict, Set
 from fee_simulator.core.round_labeling import (
     label_rounds,
-    is_appeal_round,
     get_leader_action,
     extract_rounds_data,
 )
@@ -94,9 +93,9 @@ class TestRoundLabelingInvariants:
             assert all(isinstance(label, str) for label in labels)
             assert all(label != "" for label in labels)
 
-    def test_appeal_rounds_at_odd_indices(self):
-        """Appeal rounds must occur at odd indices (1, 3, 5, ...)."""
-        # Create transaction with appeals
+    def test_appeal_rounds_detected_by_pattern(self):
+        """Appeal rounds must be detected based on vote patterns, not indices."""
+        # Create transaction with appeals at various positions
         transaction_results = TransactionRoundResults(
             rounds=[
                 # Round 0: Normal
@@ -149,16 +148,14 @@ class TestRoundLabelingInvariants:
 
         labels = label_rounds(transaction_results)
 
-        for i, label in enumerate(labels):
-            if "APPEAL" in label:
-                assert i % 2 == 1, f"Appeal round at even index {i}: {label}"
-            else:
-                assert i % 2 == 0 or label in [
-                    "SKIP_ROUND",
-                    "SPLIT_PREVIOUS_APPEAL_BOND",
-                    "LEADER_TIMEOUT_50_PREVIOUS_APPEAL_BOND",
-                    "LEADER_TIMEOUT_150_PREVIOUS_NORMAL_ROUND",
-                ], f"Non-appeal/non-special round at odd index {i}: {label}"
+        # Check that appeals are correctly identified based on vote patterns
+        # Round 1 and 3 should be appeals because they have NA votes
+        assert "APPEAL" in labels[1], f"Round 1 with NA votes should be appeal, got {labels[1]}"
+        assert "APPEAL" in labels[3], f"Round 3 with NA votes should be appeal, got {labels[3]}"
+        
+        # Rounds 0 and 2 should be normal rounds (have leader receipts)
+        assert "APPEAL" not in labels[0], f"Round 0 with leader receipt should not be appeal, got {labels[0]}"
+        assert "APPEAL" not in labels[2], f"Round 2 with leader receipt should not be appeal, got {labels[2]}"
 
     def test_deterministic_labeling(self):
         """Same input must always produce same output."""
@@ -635,15 +632,20 @@ class TestRoundCombinations:
             label_str = " -> ".join(labels)
             pattern_counts[label_str] += 1
 
-            # Verify appeal positions
+            # Verify that appeal labels correspond to appeal rounds in the transaction
             for i, label in enumerate(labels):
                 if "APPEAL" in label and label not in [
                     "SPLIT_PREVIOUS_APPEAL_BOND",
                     "LEADER_TIMEOUT_50_PREVIOUS_APPEAL_BOND",
                 ]:
-                    assert (
-                        i % 2 == 1
-                    ), f"Appeal {label} at wrong index {i} in path {path}"
+                    # Verify this round has appeal characteristics (NA votes, etc)
+                    round_obj = transaction_results.rounds[i]
+                    if round_obj.rotations:
+                        votes = round_obj.rotations[-1].votes
+                        # Appeal rounds should have NA votes or no leader receipt
+                        has_na_votes = any(v == "NA" or (isinstance(v, list) and "NA" in v) for v in votes.values())
+                        has_leader_receipt = any(isinstance(v, list) and v[0] == "LEADER_RECEIPT" for v in votes.values())
+                        assert has_na_votes or not has_leader_receipt, f"Appeal label {label} at index {i} but round doesn't have appeal characteristics"
 
         # Ensure we've seen various label types
         assert len(label_counts) > 5, "Should see variety of labels"
@@ -913,7 +915,7 @@ if __name__ == "__main__":
     # Test basic invariants
     test_invariants = TestRoundLabelingInvariants()
     test_invariants.test_every_round_has_label()
-    test_invariants.test_appeal_rounds_at_odd_indices()
+    test_invariants.test_appeal_rounds_detected_by_pattern()
     test_invariants.test_deterministic_labeling()
     print("✓ Invariant tests passed")
 
