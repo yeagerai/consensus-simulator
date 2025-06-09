@@ -18,7 +18,7 @@ from fee_simulator.display import (
     display_summary_table,
     display_test_description,
 )
-from tests.invariant_checks import check_invariants
+from tests.fee_distributions.check_invariants.invariant_checks import check_invariants
 
 leaderTimeout = 100
 validatorsTimeout = 200
