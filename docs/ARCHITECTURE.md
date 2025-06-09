@@ -362,3 +362,123 @@ check_all_invariants(fee_events, transaction, labels)
 3. **Slashing**: More complex penalty mechanisms
 4. **Multi-rotation**: Handling multiple leader elections per round
 5. **Parallel Processing**: For large-scale path testing
+
+## Round Sizes and Validator Selection Logic
+
+### Round Size Constants
+
+The system uses two separate arrays for round sizes defined in `constants.py`:
+
+```python
+NORMAL_ROUND_SIZES = [5, 11, 23, 47, 95, 191, 383, 767, 1000]
+APPEAL_ROUND_SIZES = [7, 13, 25, 49, 97, 193, 385, 769, 1000]
+```
+
+These sizes follow an exponential growth pattern (approximately doubling) to:
+- Ensure sufficient validators for consensus
+- Scale security with transaction importance
+- Balance between decentralization and efficiency
+
+### Validator Selection Patterns
+
+There are two main patterns for validator selection depending on appeal outcomes:
+
+#### Pattern 1: Successful Appeal
+When an appeal is successful, validators are combined:
+```
+Next round size = Previous normal round + Appeal round - 1
+```
+Where the `-1` represents excluding the original leader who was appealed.
+
+#### Pattern 2: Chained Unsuccessful Appeals
+When appeals are unsuccessful and chained, the system progresses through the arrays independently:
+```
+Normal rounds: Use next index in NORMAL_ROUND_SIZES
+Appeal rounds: Use next index in APPEAL_ROUND_SIZES
+```
+
+### Example Flows
+
+#### Successful Appeal Flow
+```
+Round 0 (Normal, 5 validators):
+- Leader: addr[0] 
+- Validators: addr[1], addr[2], addr[3], addr[4]
+
+Round 1 (Appeal, 7 validators):
+- New validators: addr[5], addr[6], addr[7], addr[8], addr[9], addr[10], addr[11]
+
+Round 2 (Normal, 11 validators = 5 + 7 - 1):
+- New Leader: addr[1] (promoted from original validators)
+- Validators: addr[2] through addr[11]
+- Excluded: addr[0] (original leader who was appealed)
+```
+
+#### Chained Unsuccessful Appeals Flow
+```
+Round 0 (Normal, NORMAL_ROUND_SIZES[0] = 5):
+- Validators: addr[0] through addr[4]
+
+Round 1 (Unsuccessful Appeal, APPEAL_ROUND_SIZES[0] = 7):
+- New validators: addr[5] through addr[11]
+
+Round 2 (Normal, NORMAL_ROUND_SIZES[1] = 11):
+- Validators selected from available pool
+
+Round 3 (Unsuccessful Appeal, APPEAL_ROUND_SIZES[1] = 13):
+- New validators: addr[12] through addr[24]
+
+Round 4 (Normal, NORMAL_ROUND_SIZES[2] = 23):
+- Validators selected from available pool
+
+Round 5 (Unsuccessful Appeal, APPEAL_ROUND_SIZES[2] = 25):
+- New validators added as needed
+
+Round 6 (Normal, NORMAL_ROUND_SIZES[3] = 47):
+- Validators selected from available pool
+```
+
+### Key Properties
+
+1. **Leader Exclusion**: Only occurs after successful appeals
+2. **Independent Progression**: Unsuccessful appeals don't affect round size calculation
+3. **Array Index Tracking**: System maintains separate indices for normal and appeal rounds
+4. **Validator Pool Growth**: New validators are added as needed to meet round sizes
+
+### Round Size Calculation Logic
+
+```python
+def get_round_size(round_index, round_labels):
+    normal_count = 0
+    appeal_count = 0
+    
+    for i in range(round_index + 1):
+        if is_appeal_round(round_labels[i]):
+            appeal_count += 1
+        else:
+            normal_count += 1
+    
+    if is_appeal_round(round_labels[round_index]):
+        # Use appeal count to index into APPEAL_ROUND_SIZES
+        index = appeal_count - 1
+        return APPEAL_ROUND_SIZES[index] if index < len(APPEAL_ROUND_SIZES) else APPEAL_ROUND_SIZES[-1]
+    else:
+        # Use normal count to index into NORMAL_ROUND_SIZES
+        index = normal_count - 1
+        return NORMAL_ROUND_SIZES[index] if index < len(NORMAL_ROUND_SIZES) else NORMAL_ROUND_SIZES[-1]
+```
+
+### Special Cases
+
+1. **After Successful Appeal**: Next normal round combines validators (sum - 1)
+2. **After Unsuccessful Appeal**: Next normal round uses next size in array
+3. **Mixed Patterns**: System handles combinations of successful and unsuccessful appeals
+4. **Array Bounds**: When indices exceed array length, use the last value (1000)
+
+### Validator Pool Management
+
+The system maintains a growing pool of validator addresses:
+- New validators are added during each appeal
+- Validators persist across rounds (except successfully appealed leaders)
+- Pool size grows to accommodate larger round sizes
+- Address assignment is deterministic based on round progression
