@@ -47,9 +47,17 @@ def check_conservation_of_value(
     round_labels: List[RoundLabel],
     tolerance: int = 1
 ) -> None:
-    """Invariant 1: Total costs = total earnings + refunds"""
+    """Invariant 1: Total costs = total earnings (excluding sender) + sender refunds + appealant burns"""
     total_costs = compute_agg_costs(fee_events)
     total_earnings = compute_agg_earnings(fee_events)
+    
+    # Exclude sender's earnings from total_earnings to avoid double counting
+    # since compute_sender_refund calculates what the sender should get back
+    sender_earnings = sum(
+        event.earned for event in fee_events 
+        if event.address == transaction_budget.senderAddress
+    )
+    earnings_without_sender = total_earnings - sender_earnings
     
     # Calculate refund
     sender_refund = compute_sender_refund(
@@ -59,13 +67,16 @@ def check_conservation_of_value(
         round_labels
     )
     
-    expected = total_earnings + sender_refund
+    # Calculate appealant burns (value destroyed in unsuccessful appeals)
+    appealant_burns = compute_agg_appealant_burnt(fee_events)
+    
+    expected = earnings_without_sender + sender_refund + appealant_burns
     
     if abs(total_costs - expected) > tolerance:
         raise InvariantViolation(
             "conservation_of_value",
-            f"Total costs ({total_costs}) != earnings ({total_earnings}) + "
-            f"refund ({sender_refund}). "
+            f"Total costs ({total_costs}) != earnings_without_sender ({earnings_without_sender}) + "
+            f"refund ({sender_refund}) + appealant_burns ({appealant_burns}). "
             f"Difference: {total_costs - expected}"
         )
 
@@ -89,12 +100,26 @@ def check_appeal_bond_coverage(
     """Invariant 3: Appeal bonds must cover appeal round costs"""
     for i, label in enumerate(round_labels):
         if is_appeal_round(label) and i > 0:
+            # Find the most recent normal round before this appeal
+            normal_round_index = None
+            for j in range(i-1, -1, -1):
+                if not is_appeal_round(round_labels[j]):
+                    normal_round_index = j
+                    break
+            
+            if normal_round_index is None:
+                raise InvariantViolation(
+                    "appeal_bond_coverage",
+                    f"No normal round found before appeal at index {i}"
+                )
+            
             # Calculate expected bond
             expected_bond = compute_appeal_bond(
-                normal_round_index=i-1,
+                normal_round_index=normal_round_index,
                 leader_timeout=transaction_budget.leaderTimeout,
                 validators_timeout=transaction_budget.validatorsTimeout,
-                round_labels=round_labels
+                round_labels=round_labels,
+                appeal_round_index=i
             )
             
             # Find actual bond paid
@@ -199,13 +224,21 @@ def check_appeal_follows_normal(round_labels: List[RoundLabel]) -> None:
             
             # Allow chained appeals only if they are unsuccessful appeals
             if is_appeal_round(prev_label):
-                # Check if this is a valid chain (e.g., unsuccessful appeals can chain)
-                if not (("UNSUCCESSFUL" in prev_label and "UNSUCCESSFUL" in label) or
-                        ("UNSUCCESSFUL" in prev_label and label == "SPLIT_PREVIOUS_APPEAL_BOND")):
+                # Check if this is a valid chain
+                valid_chain = (
+                    # Unsuccessful appeals can chain
+                    ("UNSUCCESSFUL" in prev_label and "UNSUCCESSFUL" in label) or
+                    # Split previous appeal bond can follow unsuccessful appeals
+                    ("UNSUCCESSFUL" in prev_label and label == "SPLIT_PREVIOUS_APPEAL_BOND") or
+                    # Successful appeals can follow unsuccessful appeals (outcome change)
+                    ("UNSUCCESSFUL" in prev_label and "SUCCESSFUL" in label)
+                )
+                
+                if not valid_chain:
                     raise InvariantViolation(
                         "appeal_follows_normal",
                         f"Appeal round '{label}' at index {i} follows another appeal '{prev_label}' "
-                        f"(only unsuccessful appeals can chain)"
+                        f"(this is not a valid appeal chain)"
                     )
 
 

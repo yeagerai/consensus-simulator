@@ -9,6 +9,7 @@ def compute_appeal_bond(
     leader_timeout: int,
     validators_timeout: int,
     round_labels: List[RoundLabel],
+    appeal_round_index: int = None,
 ) -> int:
 
     # Validate this is actually a normal round index
@@ -18,13 +19,22 @@ def compute_appeal_bond(
     if is_appeal_round(round_labels[normal_round_index]):
         raise ValueError(f"Round {normal_round_index} is not a normal round")
 
-    # The appeal round is the next round
-    appeal_round_index = normal_round_index + 1
-
-    # Check that the next round exists and is an appeal
-    if appeal_round_index >= len(round_labels):
-        raise ValueError(f"No appeal round after normal round {normal_round_index}")
-
+    # If appeal round index is not provided, find the next appeal after the normal round
+    if appeal_round_index is None:
+        # Find the next appeal round after the normal round
+        appeal_round_index = None
+        for i in range(normal_round_index + 1, len(round_labels)):
+            if is_appeal_round(round_labels[i]):
+                appeal_round_index = i
+                break
+        
+        if appeal_round_index is None:
+            raise ValueError(f"No appeal round found after normal round {normal_round_index}")
+    
+    # Validate the appeal round
+    if appeal_round_index < 0 or appeal_round_index >= len(round_labels):
+        raise ValueError(f"Invalid appeal round index: {appeal_round_index}")
+    
     if not is_appeal_round(round_labels[appeal_round_index]):
         raise ValueError(f"Round {appeal_round_index} is not an appeal round")
 
