@@ -176,16 +176,31 @@ def classify_appeal_round(
     if round_index == 0:  # Safety check
         return "EMPTY_ROUND"
 
-    prev_round = rounds[round_index - 1]
-    prev_leader_action = get_leader_action(
-        prev_round, leader_addresses[round_index - 1]
+    # For consecutive appeals, we need to find the original normal round being appealed
+    # Look back to find the most recent non-appeal round
+    original_round_index = round_index - 1
+    while original_round_index > 0:
+        # Check if the previous round is likely an appeal
+        prev_votes = rounds[original_round_index]
+        prev_leader_addr = leader_addresses[original_round_index] if original_round_index < len(leader_addresses) else None
+        if is_likely_appeal_round(prev_votes, prev_leader_addr):
+            # Keep looking back
+            original_round_index -= 1
+        else:
+            # Found a non-appeal round
+            break
+    
+    # Now classify based on the original normal round
+    orig_round = rounds[original_round_index]
+    orig_leader_action = get_leader_action(
+        orig_round, leader_addresses[original_round_index]
     )
 
-    if prev_leader_action == "LEADER_TIMEOUT":
+    if orig_leader_action == "LEADER_TIMEOUT":
         return classify_leader_timeout_appeal(round_index, rounds, leader_addresses)
     else:
-        prev_majority = compute_majority(prev_round)
-        return classify_vote_appeal(round_index, rounds, prev_majority)
+        orig_majority = compute_majority(orig_round)
+        return classify_vote_appeal(round_index, rounds, orig_majority)
 
 
 # Special case patterns
