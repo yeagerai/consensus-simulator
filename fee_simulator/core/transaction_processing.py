@@ -95,6 +95,7 @@ def process_transaction(
                         leader_timeout=transaction_budget.leaderTimeout,
                         validators_timeout=transaction_budget.validatorsTimeout,
                         round_labels=labels,  # Pass labels
+                        appeal_round_index=i,  # Pass the current appeal round index
                     )
                     fee_events.append(
                         FeeEvent(

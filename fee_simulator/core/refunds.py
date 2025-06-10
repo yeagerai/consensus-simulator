@@ -35,6 +35,7 @@ def compute_sender_refund(
                     leader_timeout=transaction_budget.leaderTimeout,
                     validators_timeout=transaction_budget.validatorsTimeout,
                     round_labels=round_labels,  # Pass round labels
+                    appeal_round_index=event.round_index,  # Pass the appeal round index
                 )
                 total_paid_from_sender += event.earned - appeal_bond
             continue
@@ -50,7 +51,8 @@ def compute_sender_refund(
 
         if event.address == sender_address:
             sender_cost += event.cost
-            total_paid_from_sender += event.earned
+            # Don't count sender's earnings as they include the refund itself
+            # which would create a circular dependency
             continue
 
         total_paid_from_sender += event.earned

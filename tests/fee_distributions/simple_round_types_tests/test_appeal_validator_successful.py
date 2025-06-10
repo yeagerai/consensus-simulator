@@ -110,17 +110,17 @@ def test_appeal_validator_successful(verbose, debug):
     # In a successful validator appeal, the appealant gets the leader timeout
     # and the appeal bond is returned
     total_earnings = sum(e.earned for e in fee_events if e.earned)
-    total_burns = sum(e.burn for e in fee_events if e.burn)
+    total_burns = sum(e.burned for e in fee_events if e.burned)
     assert total_earnings > 0, "Should have positive earnings"
     
 
 def test_appeal_validator_successful_after_disagree(verbose, debug):
-    """Test appeal_validator_successful after a majority disagree round."""
-    # Define path - validator appeal after majority disagree
+    """Test leader appeal after a majority disagree round."""
+    # Define path - leader appeal after majority disagree (only valid option)
     path = [
         "START",
         "LEADER_RECEIPT_MAJORITY_DISAGREE",  # Normal round where majority disagreed
-        "VALIDATOR_APPEAL_SUCCESSFUL",       # Validators appeal and succeed
+        "LEADER_APPEAL_SUCCESSFUL",          # Leader appeals and succeeds
         "LEADER_RECEIPT_MAJORITY_AGREE",     # Normal round after successful appeal
         "END"
     ]
@@ -149,7 +149,7 @@ def test_appeal_validator_successful_after_disagree(verbose, debug):
     if verbose:
         display_test_description(
             test_name="test_appeal_validator_successful_after_disagree",
-            test_description="This test evaluates the fee distribution for a successful validator appeal after a majority disagree round.",
+            test_description="This test evaluates the fee distribution for a successful leader appeal after a majority disagree round.",
         )
         display_summary_table(
             fee_events, transaction_results, transaction_budget, round_labels
@@ -162,9 +162,9 @@ def test_appeal_validator_successful_after_disagree(verbose, debug):
     # Round Label Assert - should have special pattern applied
     assert round_labels == [
         "SKIP_ROUND",  # Special case: normal round before successful appeal becomes SKIP_ROUND
-        "APPEAL_VALIDATOR_SUCCESSFUL",
+        "APPEAL_LEADER_SUCCESSFUL",  # Leader appeal after disagree
         "NORMAL_ROUND",
-    ], f"Expected ['SKIP_ROUND', 'APPEAL_VALIDATOR_SUCCESSFUL', 'NORMAL_ROUND'], got {round_labels}"
+    ], f"Expected ['SKIP_ROUND', 'APPEAL_LEADER_SUCCESSFUL', 'NORMAL_ROUND'], got {round_labels}"
 
     # Invariant Check
     check_comprehensive_invariants(fee_events, transaction_budget, transaction_results, round_labels)

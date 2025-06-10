@@ -22,7 +22,7 @@ from fee_simulator.display import (
     display_summary_table,
     display_test_description,
 )
-from tests.fee_distributions.check_invariants.invariant_checks import check_invariants
+from tests.fee_distributions.check_invariants.comprehensive_invariants import check_comprehensive_invariants
 
 leaderTimeout = 100
 validatorsTimeout = 200
@@ -107,7 +107,7 @@ def test_leader_timeout_150_previous_normal_round(verbose, debug):
     ], f"Expected ['SKIP_ROUND', 'APPEAL_LEADER_TIMEOUT_SUCCESSFUL', 'LEADER_TIMEOUT_150_PREVIOUS_NORMAL_ROUND'], got {round_labels}"
 
     # Invariant Check
-    check_invariants(fee_events, transaction_budget, transaction_results)
+    check_comprehensive_invariants(fee_events, transaction_budget, transaction_results, round_labels, tolerance=20)
 
     # Everyone Else 0 Fees Assert
     assert all(

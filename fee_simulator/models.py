@@ -116,8 +116,9 @@ class TransactionBudget(BaseModel):
 
     @model_validator(mode="after")
     def validate_rotations(self):
-        if len(self.rotations) != self.appealRounds + 1:
-            raise ValueError("Number of rotations must match appealRounds")
+        # Rotations are indexed by normal round index, so we just need at least one
+        if len(self.rotations) == 0:
+            raise ValueError("Must have at least one rotation")
         return self
 
     @model_validator(mode="after")

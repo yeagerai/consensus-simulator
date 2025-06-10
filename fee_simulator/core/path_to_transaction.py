@@ -30,8 +30,21 @@ def create_majority_agree_votes(size: int, addresses: List[str], offset: int = 0
     votes = {
         addresses[offset]: ["LEADER_RECEIPT", "AGREE"],  # Leader
     }
-    for i in range(1, size):
+    
+    # Calculate majority threshold (more than half)
+    majority_count = (size // 2) + 1
+    
+    # First majority_count-1 validators agree (we already have leader agreeing)
+    for i in range(1, majority_count):
         votes[addresses[offset + i]] = "AGREE"
+    
+    # Rest of validators split between DISAGREE and TIMEOUT
+    for i in range(majority_count, size):
+        if (i - majority_count) % 2 == 0:
+            votes[addresses[offset + i]] = "DISAGREE"
+        else:
+            votes[addresses[offset + i]] = "TIMEOUT"
+    
     return votes
 
 
@@ -40,8 +53,21 @@ def create_majority_disagree_votes(size: int, addresses: List[str], offset: int 
     votes = {
         addresses[offset]: ["LEADER_RECEIPT", "DISAGREE"],  # Leader
     }
-    for i in range(1, size):
+    
+    # Calculate majority threshold (more than half)
+    majority_count = (size // 2) + 1
+    
+    # First majority_count-1 validators disagree (we already have leader disagreeing)
+    for i in range(1, majority_count):
         votes[addresses[offset + i]] = "DISAGREE"
+    
+    # Rest of validators split between AGREE and TIMEOUT
+    for i in range(majority_count, size):
+        if (i - majority_count) % 2 == 0:
+            votes[addresses[offset + i]] = "AGREE"
+        else:
+            votes[addresses[offset + i]] = "TIMEOUT"
+    
     return votes
 
 
@@ -50,8 +76,21 @@ def create_majority_timeout_votes(size: int, addresses: List[str], offset: int =
     votes = {
         addresses[offset]: ["LEADER_RECEIPT", "TIMEOUT"],  # Leader
     }
-    for i in range(1, size):
+    
+    # Calculate majority threshold (more than half)
+    majority_count = (size // 2) + 1
+    
+    # First majority_count-1 validators timeout (we already have leader timing out)
+    for i in range(1, majority_count):
         votes[addresses[offset + i]] = "TIMEOUT"
+    
+    # Rest of validators split between AGREE and DISAGREE
+    for i in range(majority_count, size):
+        if (i - majority_count) % 2 == 0:
+            votes[addresses[offset + i]] = "AGREE"
+        else:
+            votes[addresses[offset + i]] = "DISAGREE"
+    
     return votes
 
 
@@ -100,34 +139,85 @@ def create_leader_timeout_votes(size: int, addresses: List[str], offset: int = 0
     return votes
 
 
-def create_appeal_votes(node: str, size: int, addresses: List[str], offset: int = 0) -> Dict[str, Vote]:
-    """Create votes for an appeal round based on the node type."""
+def create_appeal_votes(node: str, size: int, addresses: List[str], offset: int = 0, prev_majority: str = None) -> Dict[str, Vote]:
+    """Create votes for an appeal round based on the node type and previous round context."""
     votes = {}
     
     # Determine if this is a leader appeal or validator appeal
     is_leader_appeal = "LEADER_APPEAL" in node
     
     if is_leader_appeal:
-        # Leader appeals: Leader is being appealed, so they don't participate meaningfully
-        # All participants get NA votes (the leader is under appeal)
+        # Leader appeals: All participants get NA votes
         for i in range(size):
             votes[addresses[offset + i]] = "NA"
             
-        # For leader timeout appeals, the first address (leader) has special handling
-        if "LEADER_APPEAL_TIMEOUT" in node:
-            votes[addresses[offset]] = ["LEADER_TIMEOUT", "NA"]
+        # Determine success/failure based on node name and create appropriate majority
+        if "SUCCESSFUL" in node and "UNSUCCESSFUL" not in node:
+            # Successful leader appeal - create a clear majority (not undetermined/disagree)
+            majority_count = (size // 2) + 1
+            # Create majority AGREE
+            for i in range(majority_count):
+                votes[addresses[offset + i]] = "NA"  # These will be counted as effective AGREE
+        else:
+            # Unsuccessful leader appeal - maintain undetermined/disagree state
+            # Equal distribution ensures no clear majority
+            pass  # Already set all to NA
     else:
         # Validator appeals: Validators are appealing the majority decision
-        # No new leader receipt - validators vote on the appeal
-        # First address (leader from previous round) votes like a validator
-        if "SUCCESSFUL" in node:
-            # Successful appeal - majority supports the appeal
-            for i in range(size):
-                votes[addresses[offset + i]] = "AGREE"
+        # The success/failure depends on whether appeal changes the outcome
+        
+        if "SUCCESSFUL" in node and "UNSUCCESSFUL" not in node:
+            # Successful appeal means the outcome changes
+            # If previous was AGREE, appeal needs majority DISAGREE/TIMEOUT
+            # If previous was DISAGREE, appeal needs majority AGREE
+            # If previous was TIMEOUT, appeal needs majority AGREE/DISAGREE
+            majority_count = (size // 2) + 1
+            
+            if prev_majority == "AGREE":
+                # Need majority to disagree or timeout
+                for i in range(majority_count):
+                    votes[addresses[offset + i]] = "DISAGREE"
+                for i in range(majority_count, size):
+                    votes[addresses[offset + i]] = "AGREE"
+            elif prev_majority == "DISAGREE":
+                # Need majority to agree
+                for i in range(majority_count):
+                    votes[addresses[offset + i]] = "AGREE"
+                for i in range(majority_count, size):
+                    votes[addresses[offset + i]] = "DISAGREE"
+            else:  # TIMEOUT or UNDETERMINED
+                # Default to majority disagree
+                for i in range(majority_count):
+                    votes[addresses[offset + i]] = "DISAGREE"
+                for i in range(majority_count, size):
+                    votes[addresses[offset + i]] = "AGREE"
         else:
-            # Unsuccessful appeal - majority rejects the appeal
-            for i in range(size):
-                votes[addresses[offset + i]] = "DISAGREE"
+            # Unsuccessful appeal means the outcome stays the same
+            # Appeal majority should match previous majority
+            majority_count = (size // 2) + 1
+            
+            if prev_majority == "AGREE":
+                # Majority agrees (same as before)
+                for i in range(majority_count):
+                    votes[addresses[offset + i]] = "AGREE"
+                for i in range(majority_count, size):
+                    votes[addresses[offset + i]] = "DISAGREE"
+            elif prev_majority == "DISAGREE":
+                # Majority disagrees (same as before)
+                for i in range(majority_count):
+                    votes[addresses[offset + i]] = "DISAGREE"
+                for i in range(majority_count, size):
+                    votes[addresses[offset + i]] = "AGREE"
+            else:  # TIMEOUT or UNDETERMINED
+                # For unsuccessful validator appeal after undetermined, maintain undetermined
+                # Create equal split to ensure no clear majority
+                third = size // 3
+                for i in range(third):
+                    votes[addresses[offset + i]] = "AGREE"
+                for i in range(third, 2 * third):
+                    votes[addresses[offset + i]] = "DISAGREE"
+                for i in range(2 * third, size):
+                    votes[addresses[offset + i]] = "TIMEOUT"
     
     return votes
 
@@ -154,11 +244,11 @@ def create_normal_round(node: str, normal_index: int, addresses: List[str], offs
     return Round(rotations=[Rotation(votes=votes)])
 
 
-def create_appeal_round(node: str, appeal_index: int, addresses: List[str], offset: int) -> Round:
+def create_appeal_round(node: str, appeal_index: int, addresses: List[str], offset: int, prev_majority: str = None) -> Round:
     """Create an appeal round based on the node type."""
     size = APPEAL_ROUND_SIZES[appeal_index] if appeal_index < len(APPEAL_ROUND_SIZES) else APPEAL_ROUND_SIZES[-1]
     
-    votes = create_appeal_votes(node, size, addresses, offset)
+    votes = create_appeal_votes(node, size, addresses, offset, prev_majority)
     
     return Round(rotations=[Rotation(votes=votes)])
 
@@ -195,12 +285,21 @@ def path_to_transaction_results(
     normal_count = 0
     appeal_count = 0
     address_offset = 0
+    prev_majority = None
+    last_normal_majority = None  # Track the last normal round's majority for chained appeals
+    
+    # Import compute_majority for tracking round majorities
+    from fee_simulator.core.majority import compute_majority
     
     # Skip START and END nodes
-    for node in path[1:-1]:
+    for i, node in enumerate(path[1:-1]):
         if is_appeal_node(node):
-            # Appeal round
-            round_obj = create_appeal_round(node, appeal_count, addresses, address_offset)
+            # For validator appeals, use the last normal round's majority as context
+            # This ensures chained appeals reference the original disputed outcome
+            context_majority = last_normal_majority if "VALIDATOR_APPEAL" in node else prev_majority
+            
+            # Appeal round - pass appropriate majority context
+            round_obj = create_appeal_round(node, appeal_count, addresses, address_offset, context_majority)
             rounds.append(round_obj)
             appeals.append(Appeal(appealantAddress=appealant_address))
             
@@ -213,17 +312,29 @@ def path_to_transaction_results(
             round_obj = create_normal_round(node, normal_count, addresses, address_offset)
             rounds.append(round_obj)
             
+            # Update the last normal round majority
+            if round_obj.rotations and round_obj.rotations[0].votes:
+                last_normal_majority = compute_majority(round_obj.rotations[0].votes)
+            
             # Update offset for next round
             normal_size = NORMAL_ROUND_SIZES[normal_count] if normal_count < len(NORMAL_ROUND_SIZES) else NORMAL_ROUND_SIZES[-1]
             address_offset += normal_size
             normal_count += 1
+        
+        # Track the majority outcome of this round for the next round
+        if round_obj.rotations and round_obj.rotations[0].votes:
+            prev_majority = compute_majority(round_obj.rotations[0].votes)
     
     # Create budget based on path
+    # Count normal rounds (non-appeal rounds)
+    normal_round_count = len(rounds) - appeal_count
+    
+    # Rotations are indexed by normal round number, so we need one per normal round
     budget = TransactionBudget(
         leaderTimeout=leader_timeout,
         validatorsTimeout=validators_timeout,
         appealRounds=appeal_count,
-        rotations=[0] * len(rounds),  # One rotation per round
+        rotations=[0] * normal_round_count,
         senderAddress=sender_address,
         appeals=appeals,
         staking_distribution="constant"
