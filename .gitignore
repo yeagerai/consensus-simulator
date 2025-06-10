@@ -4,3 +4,4 @@ test_results/
 checkpoints/
 .hypothesis/
 .claude/memory/
+path_jsons/

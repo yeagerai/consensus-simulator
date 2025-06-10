@@ -15,6 +15,7 @@ The simulator follows a deterministic flow: **TRANSITIONS_GRAPH → Path → Tra
 - **Appeal Mechanisms**: Handles leader and validator appeals with proper bond calculations
 - **Special Pattern Recognition**: Automatically transforms round labels based on transaction patterns
 - **Visualization Tools**: Rich formatted tables for transaction results and fee distributions
+- **Path JSON Export**: Generate compressed JSON files for all paths for external verification
 - **Modular Architecture**: Clean separation between path generation, transaction processing, and fee distribution
 
 ## Project Structure
@@ -42,14 +43,17 @@ fee_simulator/
 tests/
 ├── round_combinations/       # Path generation from TRANSITIONS_GRAPH
 │   ├── graph_data.py        # The source of truth graph
-│   └── generate_paths.py    # Path generation logic
+│   └── path_generator.py    # Path generation logic
 ├── round_labeling/          # Round detection tests
 ├── fee_distributions/       # Fee distribution tests
 │   ├── simple_round_types_tests/
 │   └── check_invariants/    # 22 invariant implementations
-└── invariant_checks.py      # Invariant verification
+└── slashing/               # Idleness and violation tests
+
+scripts/                     # Utility scripts
+├── generate_path_jsons.py   # Generate compressed JSON files for all paths
+└── decode_path_json.py      # Decode and visualize JSON path files
 ```
-- `requirements.txt`: Lists project dependencies.
 
 ## How It Works
 
@@ -108,14 +112,18 @@ Rounds are identified by their vote patterns, not their position:
     
     ```bash
     git clone <repository_url>
-    cd genlayer-fee-simulator
+    cd genlayer-fee-distribution-simulator
     ```
     
-2. Create a virtual environment and activate it:
+2. Set up the conda environment:
     
     ```bash
-    python -m venv venv
-    source venv/bin/activate  # On Windows: venv\Scripts\activate
+    # Activate miniconda
+    source ~/opt/miniconda3/bin/activate
+    
+    # Create and activate the consensus-simulator environment
+    conda create -n consensus-simulator python=3.9
+    conda activate consensus-simulator
     ```
     
 3. Install dependencies:
@@ -123,7 +131,6 @@ Rounds are identified by their vote patterns, not their position:
     ```bash
     pip install -r requirements.txt
     ```
-    
 
 ## Usage
 
@@ -135,18 +142,81 @@ To run the entire test suite:
 pytest
 ```
 
-To run the entire test suite and log all the results in a file for future analysis:
+To run tests with full output logging:
 
-```
+```bash
 pytest -s --verbose-output --debug-output > tests.txt 
 ```
-
-And then `cat tests.txt` to visualize it.
 
 To run a specific test with verbose and debug output (displays formatted tables):
 
 ```bash
-pytest tests/round_types_tests/test_normal_round.py -s --verbose-output --debug-output
+pytest tests/fee_distributions/simple_round_types_tests/test_normal_round.py -s --verbose-output --debug-output
+```
+
+To run round labeling tests with property-based testing:
+
+```bash
+pytest tests/round_labeling/test_round_labeling_properties.py -s
+```
+
+To run exhaustive path testing (can take hours for long paths):
+
+```bash
+python tests/round_labeling/run_path_tests.py
+```
+
+### Generate Path JSON Files
+
+Generate compressed JSON files for all possible paths (useful for external verification):
+
+```bash
+# Generate all paths up to length 7 (484 paths)
+python scripts/generate_path_jsons.py --max-length 7
+
+# Generate paths up to length 17 (~113M paths, requires significant time and storage)
+python scripts/generate_path_jsons.py --max-length 17
+
+# Test mode (generates only 10 paths per length)
+python scripts/generate_path_jsons.py --max-length 7 --test-mode
+
+# Specify custom output directory
+python scripts/generate_path_jsons.py --max-length 7 --output-dir custom_output
+```
+
+The generated files will be organized in directories by path length:
+```
+path_jsons/
+├── lookup_tables.json      # Decoding tables for compressed format
+├── length_03/             # Paths of length 3
+│   ├── 02-0cd0354f.json
+│   └── ...
+├── length_04/             # Paths of length 4
+│   └── ...
+└── ...
+```
+
+### Decode and Visualize Path JSON Files
+
+Decode compressed JSON files and visualize the transaction:
+
+```bash
+# Show compressed data summary and summary table (default)
+python scripts/decode_path_json.py path_jsons/length_03/02-0cd0354f.json
+
+# Show all visualizations
+python scripts/decode_path_json.py path_jsons/length_03/02-0cd0354f.json --show-all
+
+# Show specific visualizations
+python scripts/decode_path_json.py path_jsons/length_03/02-0cd0354f.json -t -f
+# -c: compressed data summary
+# -t: transaction results
+# -f: fee distribution details
+# -s: summary table
+# -a: all visualizations
+
+# Use custom path_jsons directory
+python scripts/decode_path_json.py custom_output/length_03/02-0cd0354f.json --json-dir custom_output
 ```
 
 ### Creating Custom Scenarios
@@ -154,10 +224,11 @@ pytest tests/round_types_tests/test_normal_round.py -s --verbose-output --debug-
 You can create and simulate custom transaction scenarios programmatically:
 
 ```python
-from fee_simulator.models import TransactionBudget, TransactionRoundResults, Round, Rotation, FeeEvent
+from fee_simulator.models import TransactionBudget, TransactionRoundResults, Round, Rotation
 from fee_simulator.core.transaction_processing import process_transaction
+from fee_simulator.core.round_labeling import label_rounds
 from fee_simulator.utils import generate_random_eth_address
-from fee_simulator.display import display_summary_table, display_transaction_results, display_fee_distribution
+from fee_simulator.display import display_summary_table, display_transaction_results
 
 # Generate addresses
 addresses = [generate_random_eth_address() for _ in range(6)]
@@ -185,32 +256,63 @@ rotation = Rotation(
 )
 results = TransactionRoundResults(rounds=[Round(rotations=[rotation])])
 
+# Get round labels
+round_labels = label_rounds(results)
+
 # Process transaction
-fee_events, round_labels = process_transaction(addresses, results, budget)
+fee_events, _ = process_transaction(addresses, results, budget)
 
 # Display results
 display_summary_table(fee_events, results, budget, round_labels)
 display_transaction_results(results, round_labels)
-display_fee_distribution(fee_events)
 ```
 
 ## Testing Framework
 
 The test suite covers:
 
-- **Unit Tests**: Validate individual components (e.g., budget calculations, refunds).
-- **Scenario-Based Tests**: Test specific round types (e.g., `test_normal_round.py`, `test_appeal_leader_successful.py`).
-- **Slashing Tests**: Verify slashing for idleness and deterministic violations.
-- **Edge Cases**: Handle scenarios like empty rounds, undetermined majorities, and unsuccessful appeals.
+- **Unit Tests**: Validate individual components (e.g., budget calculations, refunds)
+- **Scenario-Based Tests**: Test specific round types (e.g., normal rounds, successful/unsuccessful appeals)
+- **Property-Based Tests**: Use Hypothesis to generate test cases for round labeling
+- **Path-Based Tests**: Exhaustively test all paths through TRANSITIONS_GRAPH
+- **Invariant Tests**: Verify 22 invariants for every test case
+- **Slashing Tests**: Verify slashing for idleness and deterministic violations
+- **Edge Cases**: Handle empty rounds, undetermined majorities, and consecutive appeals
 
-Run tests with verbose output to inspect detailed fee distributions and transaction outcomes.
+## Invariants
+
+The system maintains 22 invariants that are checked for every test:
+
+1. Conservation of value
+2. Non-negative balances
+3. Appeal bond coverage
+4. Majority/minority consistency
+5. Role exclusivity
+6. Sequential processing
+7. Appeal follows normal
+8. Burn non-negativity
+9. Refund non-negativity
+10. Vote consistency
+11. Idle slashing correctness
+12. Deterministic violation slashing
+13. Leader timeout earning limits
+14. Appeal bond consistency
+15. Round size consistency
+16. Fee event ordering
+17. Stake immutability
+18. Round label validity
+19. No double penalties
+20. Earning justification
+21. Cost accounting
+22. Slashing proportionality
 
 ## Use Cases
 
-- **Economic Analysis**: Evaluate the incentive structure of the GenLayer protocol.
-- **Protocol Validation**: Simulate fee distribution before deploying protocol changes.
-- **Education**: Understand blockchain consensus and fee mechanics.
-- **Development**: Test and refine fee distribution algorithms.
+- **Economic Analysis**: Evaluate the incentive structure of the GenLayer protocol
+- **Protocol Validation**: Simulate fee distribution before deploying protocol changes
+- **Consensus Verification**: Generate test data for consensus algorithm implementations
+- **Education**: Understand blockchain consensus and fee mechanics
+- **Development**: Test and refine fee distribution algorithms
 
 ## License
 
