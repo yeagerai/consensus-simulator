@@ -60,7 +60,7 @@ def apply_appeal_validator_successful(
             hash="0xdefault",
             cost=0,
             staked=0,
-            earned=appeal_bond + budget.leaderTimeout,
+            earned=int(appeal_bond * 1.5),  # 50% return on investment
             slashed=0,
             burned=0,
         )

@@ -49,7 +49,7 @@ def apply_appeal_leader_timeout_successful(
             round_index=round_index,
             round_label="APPEAL_LEADER_TIMEOUT_SUCCESSFUL",
             role="APPEALANT",
-            earned=appeal_bond + budget.leaderTimeout / 2,
+            earned=int(appeal_bond * 1.5),  # 50% return on investment
         )
     )
     return events
