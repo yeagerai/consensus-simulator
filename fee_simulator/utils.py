@@ -41,17 +41,11 @@ def initialize_constant_stakes(
 
 def compute_total_cost(transaction_budget: TransactionBudget) -> int:
     max_round_price = 0
-    max_appealant_reward = (
-        transaction_budget.appealRounds * transaction_budget.leaderTimeout
-    )
     
     # Calculate costs for normal rounds
-    # Number of normal rounds = number of appeal rounds + 1 (assuming alternating pattern)
     num_normal_rounds = transaction_budget.appealRounds + 1
     for i in range(num_normal_rounds):
-        # Get the size from NORMAL_ROUND_SIZES
         round_size = NORMAL_ROUND_SIZES[i] if i < len(NORMAL_ROUND_SIZES) else NORMAL_ROUND_SIZES[-1]
-        # Get the number of rotations for this normal round
         rotation_count = transaction_budget.rotations[i] if i < len(transaction_budget.rotations) else 0
         max_round_price += (
             round_size
@@ -62,14 +56,21 @@ def compute_total_cost(transaction_budget: TransactionBudget) -> int:
     
     # Calculate costs for appeal rounds
     for i in range(transaction_budget.appealRounds):
-        # Get the size from APPEAL_ROUND_SIZES
         round_size = APPEAL_ROUND_SIZES[i] if i < len(APPEAL_ROUND_SIZES) else APPEAL_ROUND_SIZES[-1]
         max_round_price += (
             round_size * transaction_budget.validatorsTimeout
             + transaction_budget.leaderTimeout
         )
     
-    total_cost = max_appealant_reward + max_round_price
+    # Calculate appeal rewards (50% return on appeal bonds)
+    total_appeal_rewards = 0
+    for i in range(transaction_budget.appealRounds):
+        round_size = APPEAL_ROUND_SIZES[i] if i < len(APPEAL_ROUND_SIZES) else APPEAL_ROUND_SIZES[-1]
+        appeal_bond = round_size * transaction_budget.validatorsTimeout + transaction_budget.leaderTimeout
+        appeal_reward = int(appeal_bond * 0.5)  # 50% additional return
+        total_appeal_rewards += appeal_reward
+    
+    total_cost = max_round_price + total_appeal_rewards
     return total_cost
 
 

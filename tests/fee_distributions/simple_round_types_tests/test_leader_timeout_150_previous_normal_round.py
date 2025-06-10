@@ -125,8 +125,8 @@ def test_leader_timeout_150_previous_normal_round(verbose, debug):
     )
     assert (
         compute_total_earnings(fee_events, addresses_pool[23])
-        == appeal_bond + leaderTimeout / 2
-    ), f"Appealant should earn appeal_bond ({appeal_bond}) + 50% of leaderTimeout ({leaderTimeout / 2})"
+        == int(appeal_bond * 1.5)
+    ), f"Appealant should earn 1.5x appeal_bond ({int(appeal_bond * 1.5)}) for 50% return"
     assert (
         compute_total_costs(fee_events, addresses_pool[23]) == appeal_bond
     ), f"Appealant should have cost equal to appeal_bond ({appeal_bond})"

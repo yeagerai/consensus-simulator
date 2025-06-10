@@ -231,9 +231,9 @@ class TestAppealLeaderSuccessful:
         appealant_event = events[0]
         assert appealant_event.address == addresses_pool[98]
         assert appealant_event.role == "APPEALANT"
-        # Appealant should earn appeal bond + leader timeout
+        # Appealant should earn 1.5x appeal bond for 50% return
         # Appeal bond = 7 validators * 200 + 100 = 1500
-        assert appealant_event.earned == 1500 + 100  # 1600
+        assert appealant_event.earned == int(1500 * 1.5)  # 2250
         assert appealant_event.cost == 0  # Cost is recorded separately
 
 
@@ -290,9 +290,9 @@ class TestAppealValidatorSuccessful:
         # Should have events for appealant and validators from both rounds
         assert len(events) == 13  # appealant + 5 validators from normal round + 7 from appeal round
         
-        # Appealant should earn appeal bond + leader timeout
+        # Appealant should earn 1.5x appeal bond for 50% return
         appealant_event = next(e for e in events if e.address == addresses_pool[98])
-        assert appealant_event.earned == (7 * 200 + 100) + 100  # appeal_bond + leader_timeout = 1600
+        assert appealant_event.earned == int((7 * 200 + 100) * 1.5)  # 1.5x appeal_bond = 2250
         
         # In successful appeal, the function combines votes from both rounds
         # Normal round: 3 AGREE, 2 DISAGREE

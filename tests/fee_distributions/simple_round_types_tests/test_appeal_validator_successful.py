@@ -91,8 +91,8 @@ def test_appeal_validator_successful(verbose, debug):
     )
     appealant_earnings = compute_total_earnings(fee_events, appealant_address)
     assert (
-        appealant_earnings == appeal_bond + leaderTimeout
-    ), f"Appealant should earn appeal_bond ({appeal_bond}) + leaderTimeout ({leaderTimeout}), got {appealant_earnings}"
+        appealant_earnings == int(appeal_bond * 1.5)
+    ), f"Appealant should earn 1.5x appeal_bond ({int(appeal_bond * 1.5)}) for 50% return, got {appealant_earnings}"
     
     appealant_costs = compute_total_costs(fee_events, appealant_address)
     assert (
@@ -178,5 +178,5 @@ def test_appeal_validator_successful_after_disagree(verbose, debug):
     )
     appealant_earnings = compute_total_earnings(fee_events, appealant_address)
     assert (
-        appealant_earnings == appeal_bond + leaderTimeout
-    ), f"Appealant should earn appeal_bond ({appeal_bond}) + leaderTimeout ({leaderTimeout}), got {appealant_earnings}"
+        appealant_earnings == int(appeal_bond * 1.5)
+    ), f"Appealant should earn 1.5x appeal_bond ({int(appeal_bond * 1.5)}) for 50% return, got {appealant_earnings}"
