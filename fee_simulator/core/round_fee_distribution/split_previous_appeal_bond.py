@@ -60,7 +60,6 @@ def apply_split_previous_appeal_bond(
     if majority == "UNDETERMINED":
         # Split among all validators equally
         undet_split_amount = split_amount(amount_to_split, len(votes))
-        print(f"Undetermined split amount: {undet_split_amount}")
         for addr in votes.keys():
             events.append(
                 FeeEvent(
