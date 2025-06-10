@@ -8,7 +8,8 @@
 5. [Round Types and Labeling](#round-types-and-labeling)
 6. [Fee Distribution Logic](#fee-distribution-logic)
 7. [Testing Architecture](#testing-architecture)
-8. [Recent Refactors](#recent-refactors)
+8. [Path Generation and Export](#path-generation-and-export)
+9. [Recent Refactors](#recent-refactors)
 
 ## Overview
 
@@ -18,7 +19,8 @@ The GenLayer Fee Distribution Simulator is a comprehensive system for modeling a
 - **Path-based Flow**: The system follows a deterministic flow from graph paths to fee distributions
 - **Content-based Detection**: Round types are determined by vote patterns, not indices
 - **Immutable Data Structures**: All fee events are immutable for auditability
-- **Comprehensive Testing**: Every path through the system is tested with invariants
+- **Comprehensive Testing**: Every path through the system is tested with 22 invariants
+- **Exhaustive Verification**: Can generate ~113M paths for external validation
 
 ## Core Architecture
 
@@ -70,8 +72,10 @@ graph TB
     subgraph "Output Layer"
         FE[Fee Events]
         REF[Refunds]
+        JSON[JSON Export]
         DR --> FE
         FE --> REF
+        FE --> JSON
     end
 ```
 
@@ -86,32 +90,43 @@ sequenceDiagram
     participant T as TransactionRoundResults
     participant L as Round Labels
     participant F as Fee Events
+    participant J as JSON Export
     
     G->>P: Generate valid paths
     P->>T: Convert to transaction structure
     T->>L: Label rounds by content
     L->>F: Distribute fees by label
     F->>F: Calculate refunds
+    F->>J: Export compressed JSON
 ```
 
 ### 1. **Graph → Path**
-- The `TRANSITIONS_GRAPH` defines all valid state transitions
+- The `TRANSITIONS_GRAPH` in `tests/round_combinations/graph_data.py` defines all valid state transitions
 - Path generator creates sequences like `["START", "LEADER_RECEIPT_MAJORITY_AGREE", "APPEAL_VALIDATOR_SUCCESSFUL", "END"]`
+- Single source of truth for all possible transaction flows
 
 ### 2. **Path → Transaction**
 - `path_to_transaction.py` converts paths to `TransactionRoundResults`
 - Creates appropriate vote patterns for each node type
 - Generates `TransactionBudget` with appeal information
+- Handles consecutive appeals correctly
 
 ### 3. **Transaction → Labels**
 - `round_labeling.py` analyzes vote patterns to determine round types
 - No dependency on round indices - purely content-based
 - Applies special pattern transformations (e.g., SKIP_ROUND)
+- Handles consecutive appeals by looking back to original normal round
 
 ### 4. **Labels → Fees**
 - `distribute_round.py` routes to specific distribution functions
 - Each label has a corresponding fee distribution strategy
 - Events are immutable and include all transaction details
+
+### 5. **Fees → Export**
+- `scripts/generate_path_jsons.py` exports compressed JSON files
+- Sequential address numbering (1, 2, 3...)
+- Bitfield encoding for invariant results
+- ~800 bytes per path vs 43KB uncompressed
 
 ## Key Components
 
@@ -192,6 +207,20 @@ Special patterns trigger label transformations:
 ["SKIP_ROUND", "APPEAL_LEADER_SUCCESSFUL", "NORMAL_ROUND"]
 ```
 
+### Consecutive Appeal Handling
+The system correctly handles consecutive appeals:
+```python
+def classify_appeal_round(round_index, rounds, leader_addresses):
+    # Look back to find the original normal round being appealed
+    original_round_index = round_index - 1
+    while original_round_index > 0:
+        if is_likely_appeal_round(rounds[original_round_index], ...):
+            original_round_index -= 1
+        else:
+            break
+    # Classify based on the original normal round
+```
+
 ## Fee Distribution Logic
 
 ### Distribution Router
@@ -248,6 +277,7 @@ graph TD
     T --> I[Integration Tests]
     T --> P[Path-based Tests]
     T --> V[Invariant Tests]
+    T --> E[Exhaustive Tests]
     
     U --> UF[Fee Functions]
     U --> RL[Round Labeling]
@@ -257,41 +287,66 @@ graph TD
     P --> CP[Combination Paths]
     P --> EP[Edge Cases]
     
-    V --> CI[Conservation]
-    V --> SI[State Invariants]
-    V --> BI[Business Rules]
+    V --> CI[22 Invariants]
+    
+    E --> PE[Path Export]
+    E --> PV[Path Verification]
 ```
 
-### 1. **Unit Tests** (`tests/unittests/`)
-- Test individual functions in isolation
-- Mock dependencies
-- Fast execution
+### Test Organization
 
-### 2. **Round Labeling Tests** (`tests/round_labeling/`)
-- Test pattern detection
-- Verify special case transformations
-- Test with generated paths from graph
+1. **Unit Tests** (`tests/fee_distributions/unit_tests/`)
+   - Test individual distribution functions
+   - Mock dependencies
+   - Fast execution
 
-### 3. **Fee Distribution Tests** (`tests/fee_distributions/`)
-- `simple_round_types_tests/`: Test each round type individually
-- `check_invariants/`: Comprehensive invariant checking
-- Integration tests with full transaction flow
+2. **Round Labeling Tests** (`tests/round_labeling/`)
+   - Test pattern detection
+   - Property-based testing with Hypothesis
+   - Exhaustive path testing
+   - Chained appeal scenarios
 
-### 4. **Path Combination Tests** (`tests/round_combinations/`)
-- Generate all valid paths from `TRANSITIONS_GRAPH`
-- Test exhaustively up to certain lengths
-- Verify invariants hold for all paths
+3. **Fee Distribution Tests** (`tests/fee_distributions/`)
+   - `simple_round_types_tests/`: Test each round type individually
+   - `check_invariants/`: Comprehensive invariant checking
+   - Integration tests with full transaction flow
 
-### Invariants
-The system maintains 22 critical invariants:
+4. **Path Combination Tests** (`tests/round_combinations/`)
+   - Generate all valid paths from `TRANSITIONS_GRAPH`
+   - Matrix-based counting and DFS generation
+   - Critical path analysis
+   - Test exhaustively up to certain lengths
 
-1. **Conservation of Value**: Total costs = earnings + burns + refunds
-2. **Non-negative Balances**: No address has negative balance
-3. **Appeal Bond Payment**: Appealants pay correct bonds
-4. **Round Completion**: All rounds are processed
-5. **Deterministic Distribution**: Same input → same output
-6. **Role Consistency**: One role per participant per round
-7. ...and 16 more
+5. **Slashing Tests** (`tests/slashing/`)
+   - Test idleness penalties
+   - Test deterministic violation penalties
+   - Test tribunal appeals
+
+### 22 Invariants
+The system maintains critical invariants checked in `comprehensive_invariants.py`:
+
+1. Conservation of value
+2. Non-negative balances
+3. Appeal bond coverage
+4. Majority/minority consistency
+5. Role exclusivity
+6. Sequential processing
+7. Appeal follows normal
+8. Burn non-negativity
+9. Refund non-negativity
+10. Vote consistency
+11. Idle slashing correctness
+12. Deterministic violation slashing
+13. Leader timeout earning limits
+14. Appeal bond consistency
+15. Round size consistency
+16. Fee event ordering
+17. Stake immutability
+18. Round label validity
+19. No double penalties
+20. Earning justification
+21. Cost accounting
+22. Slashing proportionality
 
 ### Test Execution Flow
 ```python
@@ -300,10 +355,54 @@ path = ["START", "LEADER_RECEIPT_MAJORITY_AGREE", "END"]
 ↓
 transaction = path_to_transaction_results(path)
 ↓
-fee_events, labels = process_transaction(transaction)
+labels = label_rounds(transaction)
 ↓
-check_all_invariants(fee_events, transaction, labels)
+fee_events = process_transaction(transaction)
+↓
+check_comprehensive_invariants(fee_events, transaction, labels)
 ```
+
+## Path Generation and Export
+
+### Path Generation (`scripts/generate_path_jsons.py`)
+- Generates all paths from TRANSITIONS_GRAPH
+- Exports compressed JSON files (~800 bytes each)
+- Sequential address numbering (1, 2, 3...)
+- Bitfield encoding for invariant results
+- Organized by path length
+
+### JSON Format
+```json
+{
+  "path": [0, 1, 6, 12],           // Node indices
+  "labels": [0, 6],                // Round label indices
+  "participants": {                // Only active participants
+    "1": {
+      "r": [[0,0], [1,1]],        // [round_index, role_index]
+      "c": 0,                     // cost
+      "e": 300,                   // earned
+      "s": 0,                     // slashed
+      "b": 0                      // burned
+    }
+  },
+  "invariants": 4194303,          // Bitfield (all 22 bits set)
+  "hash": "0cd0354f..."           // Path hash
+}
+```
+
+### Path Visualization (`scripts/decode_path_json.py`)
+- Decodes compressed JSON format
+- Reconstructs full transaction
+- Displays multiple visualizations:
+  - Compressed data summary
+  - Transaction results
+  - Fee distribution details
+  - Summary table
+
+### Export Statistics
+- Length 3: 4 paths
+- Length 7: 484 paths
+- Length 17: ~113M paths (estimated)
 
 ## Recent Refactors
 
@@ -327,6 +426,16 @@ check_all_invariants(fee_events, transaction, labels)
 - Count actual appeal rounds to find indices
 - Find previous normal rounds by searching backwards
 
+### 5. **Consecutive Appeal Fix**
+- Fixed round labeling to handle consecutive appeals
+- Look back through appeal chain to find original normal round
+- Prevents misclassification of chained appeals
+
+### 6. **JSON Export System**
+- Added compressed JSON export for all paths
+- Enables external verification by consensus team
+- Efficient format reduces storage by 98%
+
 ## Configuration and Extension
 
 ### Adding New Round Types
@@ -334,7 +443,8 @@ check_all_invariants(fee_events, transaction, labels)
 2. Create distribution function in `round_fee_distribution/`
 3. Add case in `distribute_round.py`
 4. Update pattern matching in `round_labeling.py`
-5. Add tests
+5. Add to lookup tables in export scripts
+6. Add tests
 
 ### Adding New Vote Types
 1. Update `Vote` type definition
@@ -350,18 +460,12 @@ check_all_invariants(fee_events, transaction, labels)
 ## Performance Considerations
 
 - **Path Generation**: Exponential growth with max length
-  - Length 7: ~1,000 paths
-  - Length 19: ~130 million paths
+  - Length 3: 4 paths
+  - Length 7: 484 paths
+  - Length 17: ~113 million paths
 - **Memory**: Fee events are kept in memory
+- **JSON Export**: ~800 bytes per path compressed
 - **Optimization**: Use batch processing for large path sets
-
-## Future Enhancements
-
-1. **Toppers**: Special participants with different fee structures
-2. **Dynamic Round Sizes**: Adjust based on network conditions
-3. **Slashing**: More complex penalty mechanisms
-4. **Multi-rotation**: Handling multiple leader elections per round
-5. **Parallel Processing**: For large-scale path testing
 
 ## Round Sizes and Validator Selection Logic
 
@@ -397,47 +501,6 @@ Normal rounds: Use next index in NORMAL_ROUND_SIZES
 Appeal rounds: Use next index in APPEAL_ROUND_SIZES
 ```
 
-### Example Flows
-
-#### Successful Appeal Flow
-```
-Round 0 (Normal, 5 validators):
-- Leader: addr[0] 
-- Validators: addr[1], addr[2], addr[3], addr[4]
-
-Round 1 (Appeal, 7 validators):
-- New validators: addr[5], addr[6], addr[7], addr[8], addr[9], addr[10], addr[11]
-
-Round 2 (Normal, 11 validators = 5 + 7 - 1):
-- New Leader: addr[1] (promoted from original validators)
-- Validators: addr[2] through addr[11]
-- Excluded: addr[0] (original leader who was appealed)
-```
-
-#### Chained Unsuccessful Appeals Flow
-```
-Round 0 (Normal, NORMAL_ROUND_SIZES[0] = 5):
-- Validators: addr[0] through addr[4]
-
-Round 1 (Unsuccessful Appeal, APPEAL_ROUND_SIZES[0] = 7):
-- New validators: addr[5] through addr[11]
-
-Round 2 (Normal, NORMAL_ROUND_SIZES[1] = 11):
-- Validators selected from available pool
-
-Round 3 (Unsuccessful Appeal, APPEAL_ROUND_SIZES[1] = 13):
-- New validators: addr[12] through addr[24]
-
-Round 4 (Normal, NORMAL_ROUND_SIZES[2] = 23):
-- Validators selected from available pool
-
-Round 5 (Unsuccessful Appeal, APPEAL_ROUND_SIZES[2] = 25):
-- New validators added as needed
-
-Round 6 (Normal, NORMAL_ROUND_SIZES[3] = 47):
-- Validators selected from available pool
-```
-
 ### Key Properties
 
 1. **Leader Exclusion**: Only occurs after successful appeals
@@ -445,40 +508,10 @@ Round 6 (Normal, NORMAL_ROUND_SIZES[3] = 47):
 3. **Array Index Tracking**: System maintains separate indices for normal and appeal rounds
 4. **Validator Pool Growth**: New validators are added as needed to meet round sizes
 
-### Round Size Calculation Logic
+## Future Enhancements
 
-```python
-def get_round_size(round_index, round_labels):
-    normal_count = 0
-    appeal_count = 0
-    
-    for i in range(round_index + 1):
-        if is_appeal_round(round_labels[i]):
-            appeal_count += 1
-        else:
-            normal_count += 1
-    
-    if is_appeal_round(round_labels[round_index]):
-        # Use appeal count to index into APPEAL_ROUND_SIZES
-        index = appeal_count - 1
-        return APPEAL_ROUND_SIZES[index] if index < len(APPEAL_ROUND_SIZES) else APPEAL_ROUND_SIZES[-1]
-    else:
-        # Use normal count to index into NORMAL_ROUND_SIZES
-        index = normal_count - 1
-        return NORMAL_ROUND_SIZES[index] if index < len(NORMAL_ROUND_SIZES) else NORMAL_ROUND_SIZES[-1]
-```
-
-### Special Cases
-
-1. **After Successful Appeal**: Next normal round combines validators (sum - 1)
-2. **After Unsuccessful Appeal**: Next normal round uses next size in array
-3. **Mixed Patterns**: System handles combinations of successful and unsuccessful appeals
-4. **Array Bounds**: When indices exceed array length, use the last value (1000)
-
-### Validator Pool Management
-
-The system maintains a growing pool of validator addresses:
-- New validators are added during each appeal
-- Validators persist across rounds (except successfully appealed leaders)
-- Pool size grows to accommodate larger round sizes
-- Address assignment is deterministic based on round progression
+1. **Parallel Processing**: For large-scale path generation
+2. **Incremental Export**: Stream JSON files instead of batch
+3. **Path Filtering**: Generate only specific path patterns
+4. **Visualization Dashboard**: Web interface for path exploration
+5. **Performance Metrics**: Track processing time per path
