@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Any
 from collections import defaultdict
 import argparse
+from tqdm import tqdm
 
 # Add parent directory to path to enable imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -114,32 +115,39 @@ def get_address_index(address: str, address_map: Dict[str, int]) -> int:
     return address_map[address]
 
 
-def check_invariants(fee_events, transaction_budget, transaction_results, round_labels) -> int:
+def check_invariants(
+    fee_events, transaction_budget, transaction_results, round_labels
+) -> int:
     """
     Check invariants and return bitfield of results.
     Returns an integer where each bit represents whether an invariant passed (1) or failed (0).
     """
     from tests.fee_distributions.check_invariants.comprehensive_invariants import (
-        check_comprehensive_invariants
+        check_comprehensive_invariants,
     )
-    
+
     bitfield = 0
-    
+
     try:
         # Try to check all invariants
         check_comprehensive_invariants(
-            fee_events, transaction_budget, transaction_results, round_labels, tolerance=20
+            fee_events,
+            transaction_budget,
+            transaction_results,
+            round_labels,
+            tolerance=20,
         )
         # If no exception, all invariants passed
         bitfield = (1 << len(INVARIANT_BITS)) - 1  # All bits set to 1
     except AssertionError as e:
+        print(f"Error checking invariants: {e}")
         # Parse which invariants failed from the error message
         # For now, we'll set all bits to 1 except a few to indicate some failure
         # In a real implementation, we'd parse the specific failing invariants
         bitfield = (1 << len(INVARIANT_BITS)) - 1  # Start with all passing
         # Clear first bit to indicate at least one failure
         bitfield &= ~1
-    
+
     return bitfield
 
 
@@ -148,7 +156,7 @@ def process_path(path: List[str], addresses: List[str]) -> Dict[str, Any]:
     # Fixed addresses for sender and appealant
     sender_address = addresses[-1]
     appealant_address = addresses[-2]
-    
+
     # Convert path to transaction results
     transaction_results, transaction_budget = path_to_transaction_results(
         path=path,
@@ -158,60 +166,62 @@ def process_path(path: List[str], addresses: List[str]) -> Dict[str, Any]:
         leader_timeout=LEADER_TIMEOUT,
         validators_timeout=VALIDATORS_TIMEOUT,
     )
-    
+
     # Get round labels
     round_labels = label_rounds(transaction_results)
-    
+
     # Process transaction
     fee_events, _ = process_transaction(
         addresses=addresses,
         transaction_results=transaction_results,
         transaction_budget=transaction_budget,
     )
-    
+
     # Address mapping for sequential numbering
     address_map = {}
-    
+
     # Aggregate results by participant
-    participants = defaultdict(lambda: {
-        "r": [],  # rounds with roles
-        "c": 0,   # cost
-        "e": 0,   # earned
-        "s": 0,   # slashed
-        "b": 0,   # burned
-    })
-    
+    participants = defaultdict(
+        lambda: {
+            "r": [],  # rounds with roles
+            "c": 0,  # cost
+            "e": 0,  # earned
+            "s": 0,  # slashed
+            "b": 0,  # burned
+        }
+    )
+
     for event in fee_events:
         if event.address:
             addr_idx = get_address_index(event.address, address_map)
-            
+
             # Track rounds and roles
             if event.round_index is not None and event.role:
                 role_idx = ROLE_TO_IDX.get(event.role, -1)
                 if role_idx >= 0:
                     participants[addr_idx]["r"].append([event.round_index, role_idx])
-            
+
             # Aggregate amounts
             participants[addr_idx]["c"] += event.cost
             participants[addr_idx]["e"] += event.earned
             participants[addr_idx]["s"] += event.slashed
             participants[addr_idx]["b"] += event.burned
-    
+
     # Filter out participants with no activity (excluding initial stake events)
     active_participants = {}
     for addr_idx, data in participants.items():
         if data["c"] > 0 or data["e"] > 0 or data["s"] > 0 or data["b"] > 0:
             active_participants[addr_idx] = data
-    
+
     # Convert path and labels to indices
     path_indices = [NODE_TO_IDX[node] for node in path]
     label_indices = [LABEL_TO_IDX.get(label, -1) for label in round_labels]
-    
+
     # Check invariants
     invariant_bitfield = check_invariants(
         fee_events, transaction_budget, transaction_results, round_labels
     )
-    
+
     # Create result
     result = {
         "path": path_indices,
@@ -220,7 +230,7 @@ def process_path(path: List[str], addresses: List[str]) -> Dict[str, Any]:
         "invariants": invariant_bitfield,
         "hash": hash_path(path),
     }
-    
+
     return result
 
 
@@ -238,117 +248,139 @@ def save_lookup_tables(output_dir: Path):
     idx_to_node = {v: k for k, v in NODE_TO_IDX.items()}
     idx_to_label = {v: k for k, v in LABEL_TO_IDX.items()}
     idx_to_role = {v: k for k, v in ROLE_TO_IDX.items()}
-    
+
     lookup_tables = {
         "node_map": idx_to_node,
         "label_map": idx_to_label,
         "role_map": idx_to_role,
         "invariant_bits": {str(v): k for k, v in INVARIANT_BITS.items()},
     }
-    
+
     lookup_file = output_dir / "lookup_tables.json"
-    with open(lookup_file, 'w') as f:
+    with open(lookup_file, "w") as f:
         json.dump(lookup_tables, f, indent=2)
-    
+
     print(f"Saved lookup tables to {lookup_file}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate JSON files for fee distribution paths")
+    parser = argparse.ArgumentParser(
+        description="Generate JSON files for fee distribution paths"
+    )
     parser.add_argument(
-        "--output-dir", 
-        type=str, 
+        "--output-dir",
+        type=str,
         default="path_jsons",
-        help="Output directory for JSON files"
+        help="Output directory for JSON files",
     )
     parser.add_argument(
-        "--max-length",
-        type=int,
-        default=17,
-        help="Maximum path length to generate"
+        "--max-length", type=int, default=17, help="Maximum path length to generate"
     )
     parser.add_argument(
-        "--test-mode",
-        action="store_true",
-        help="Run in test mode with limited paths"
+        "--test-mode", action="store_true", help="Run in test mode with limited paths"
     )
     parser.add_argument(
         "--batch-size",
         type=int,
         default=1000,
-        help="Number of paths to process before printing progress"
+        help="Number of paths to process before updating progress (deprecated, kept for compatibility)",
     )
-    
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Show detailed error information including stack traces",
+    )
+
     args = parser.parse_args()
-    
+
     # Create output directory
     output_dir = Path(args.output_dir)
     output_dir.mkdir(exist_ok=True)
-    
+
     # Save lookup tables
     save_lookup_tables(output_dir)
-    
+
     # Generate addresses pool
     addresses = [generate_random_eth_address() for _ in range(1000)]
-    
+
     # Initialize counters
     processed = 0
     errors = 0
-    
+
     print(f"Generating paths up to length {args.max_length}...")
-    
+
+    # First, count total paths to process
+    total_paths = 0
+    print("Counting total paths...")
+    for length in range(3, args.max_length + 1):
+        constraints = PathConstraints(
+            source_node="START", target_node="END", min_length=length, max_length=length
+        )
+        paths = generate_all_paths(TRANSACTION_GRAPH, constraints)
+        path_count = len(list(paths))
+        total_paths += path_count
+        print(f"Length {length}: {path_count} paths")
+
+    print(f"\nTotal paths to process: {total_paths}")
+
     # Process by length to organize output
     # Start from length 3 as minimum
+    progress_bar = tqdm(total=total_paths, desc="Processing paths", unit="path")
+
     for length in range(3, args.max_length + 1):
         length_dir = output_dir / f"length_{length:02d}"
         length_dir.mkdir(exist_ok=True)
-        
+
         length_count = 0
-        
+
         # Generate paths of this length
         constraints = PathConstraints(
             source_node="START",
             target_node="END",
             min_length=length,  # length is measured in edges
-            max_length=length   # exact length
+            max_length=length,  # exact length
         )
-        
+
         all_paths = generate_all_paths(TRANSACTION_GRAPH, constraints)
-        
+
         for path in all_paths:
-            
+
             if args.test_mode and length_count >= 10:
                 break
-            
+
             try:
                 # Process the path
                 result = process_path(path, addresses)
-                
+
                 # Save to file
                 filename = generate_filename(path)
                 filepath = length_dir / filename
-                
-                with open(filepath, 'w') as f:
-                    json.dump(result, f, separators=(',', ':'))  # Compact format
-                
+
+                with open(filepath, "w") as f:
+                    json.dump(result, f, separators=(",", ":"))  # Compact format
+
                 processed += 1
                 length_count += 1
-                
-                if processed % args.batch_size == 0:
-                    print(f"Processed {processed} paths...")
-                    
+                progress_bar.update(1)
+
             except Exception as e:
                 errors += 1
-                print(f"Error processing path {path}: {e}")
+                print(f"\nError processing path {path}: {e}")
+                if args.debug or args.test_mode:
+                    import traceback
+
+                    traceback.print_exc()
+                    print(f"Path length: {len(path)}")
+                    print(f"Path hash: {hash_path(path)}")
                 if args.test_mode:
                     raise
-        
-        print(f"Length {length}: {length_count} paths")
-        
+
         if args.test_mode:
             print("Test mode: stopping after first length")
             break
-    
+
+    progress_bar.close()
+
     print(f"\nCompleted!")
     print(f"Total paths processed: {processed}")
     print(f"Errors: {errors}")
