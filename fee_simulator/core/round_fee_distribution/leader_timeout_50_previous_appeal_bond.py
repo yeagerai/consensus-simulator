@@ -25,7 +25,6 @@ def apply_leader_timeout_50_previous_appeal_bond(
         not round.rotations
         or not budget.appeals
         or round_index < 1
-        or round_index - 1 > len(budget.appeals)
     ):
         return events
 

@@ -257,6 +257,18 @@ SPECIAL_CASE_PATTERNS = [
             2: "LEADER_TIMEOUT_50_PREVIOUS_APPEAL_BOND",
         },
     },
+    {
+        "name": "Any leader timeout after unsuccessful leader appeal",
+        "pattern": [
+            "LEADER_TIMEOUT",
+            "APPEAL_LEADER_TIMEOUT_UNSUCCESSFUL",
+            "LEADER_TIMEOUT",
+        ],
+        "changes": {
+            0: "LEADER_TIMEOUT_50_PERCENT",
+            2: "LEADER_TIMEOUT_50_PREVIOUS_APPEAL_BOND",
+        },
+    },
 ]
 
 
