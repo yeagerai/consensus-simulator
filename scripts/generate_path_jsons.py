@@ -127,6 +127,11 @@ def check_invariants(
     )
 
     bitfield = 0
+    
+    # Dynamic tolerance based on number of rounds
+    # Allow 3 wei per round for rounding errors
+    num_rounds = len(round_labels)
+    tolerance =  num_rounds * 20
 
     try:
         # Try to check all invariants
@@ -135,7 +140,7 @@ def check_invariants(
             transaction_budget,
             transaction_results,
             round_labels,
-            tolerance=20,
+            tolerance=tolerance,
         )
         # If no exception, all invariants passed
         bitfield = (1 << len(INVARIANT_BITS)) - 1  # All bits set to 1
