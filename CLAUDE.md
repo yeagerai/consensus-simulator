@@ -5,9 +5,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ### Environment Setup
+
+First run cwd to know where you are. 
+
+If you are in a MacOS, then:
+
 ```bash
 # Activate the conda environment
-source /opt/miniconda3/bin/activate
+source /Users/{username}/opt/miniconda3/bin/activate
+conda activate consensus-simulator
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+If you are in a Linux:
+```bash
+# Activate the conda environment
+source /home/{username}/miniconda3/bin/activate
 conda activate consensus-simulator
 
 # Install dependencies

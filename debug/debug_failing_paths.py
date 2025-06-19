@@ -4,7 +4,7 @@
 import sys
 import os
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tests.round_combinations.graph_data import TRANSACTION_GRAPH
 from tests.round_combinations.path_generator import generate_all_paths
@@ -49,21 +49,21 @@ for length in [3, 4]:
             round_labels = label_rounds(transaction_results)
 
             # Process transaction
-            fee_events, final_stakes = process_transaction(
+            fee_events, labels = process_transaction(
                 addresses=addresses,
                 transaction_results=transaction_results,
                 transaction_budget=transaction_budget,
             )
 
             # Check invariants
-            violations = check_all_invariants(
+            success, violations = check_all_invariants(
                 fee_events=fee_events,
                 transaction_results=transaction_results,
                 transaction_budget=transaction_budget,
                 round_labels=round_labels,
             )
 
-            if violations:
+            if not success:
                 failing_paths.append((path, violations))
 
         except Exception as e:

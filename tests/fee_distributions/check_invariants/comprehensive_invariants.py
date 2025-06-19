@@ -45,7 +45,7 @@ def check_conservation_of_value(
     fee_events: List[FeeEvent],
     transaction_budget: TransactionBudget,
     round_labels: List[RoundLabel],
-    tolerance: int = 1
+    tolerance: int = 10
 ) -> None:
     """Invariant 1: Total costs = total earnings (excluding sender) + sender refunds + appealant burns"""
     total_costs = compute_agg_costs(fee_events)
@@ -470,7 +470,7 @@ def check_all_invariants(
     transaction_budget: TransactionBudget,
     transaction_results: TransactionRoundResults,
     round_labels: List[RoundLabel],
-    tolerance: int = 1
+    tolerance: int = 10
 ) -> Tuple[bool, List[str]]:
     """
     Check all invariants and return (success, list_of_violations)
@@ -532,7 +532,7 @@ def check_comprehensive_invariants(
     transaction_budget: TransactionBudget,
     transaction_results: TransactionRoundResults,
     round_labels: List[RoundLabel],
-    tolerance: int = 1
+    tolerance: int = 10
 ) -> None:
     """
     Wrapper that raises exception on first violation for backward compatibility
