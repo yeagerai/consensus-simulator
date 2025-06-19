@@ -242,3 +242,5 @@ The system maintains critical invariants checked in `comprehensive_invariants.py
 - 1/3 AGREE
 - 1/3 DISAGREE  
 - 1/3 TIMEOUT
+
+TODO: refactor the debug/ folder into new types of tests. Some that are very specific, just delete.

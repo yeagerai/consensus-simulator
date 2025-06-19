@@ -128,10 +128,27 @@ def check_invariants(
 
     bitfield = 0
     
-    # Dynamic tolerance based on number of rounds
-    # Allow 3 wei per round for rounding errors
+    # Dynamic tolerance based on number of rounds and actual rounding operations
+    # Rounding errors occur when split_amount divides amounts among validators
+    # Count rounds that actually perform splits
     num_rounds = len(round_labels)
-    tolerance =  num_rounds * 20
+    
+    # Count rounds that perform fee splits (these cause rounding errors)
+    split_rounds = 0
+    for label in round_labels:
+        if label in [
+            "NORMAL_ROUND",
+            "SPLIT_PREVIOUS_APPEAL_BOND", 
+            "APPEAL_VALIDATOR_SUCCESSFUL",
+            "APPEAL_VALIDATOR_UNSUCCESSFUL",
+            "LEADER_TIMEOUT_150_PREVIOUS_NORMAL_ROUND"
+        ]:
+            split_rounds += 1
+    
+    # Each split can lose up to (number_of_recipients - 1) wei
+    # Use average round size as estimate
+    avg_round_size = 200  # Conservative average between small and large rounds
+    tolerance = split_rounds * avg_round_size + num_rounds * 2  # Plus small buffer per round
 
     try:
         # Try to check all invariants
@@ -152,6 +169,8 @@ def check_invariants(
         bitfield = (1 << len(INVARIANT_BITS)) - 1  # Start with all passing
         # Clear first bit to indicate at least one failure
         bitfield &= ~1
+        # Re-raise the error so it gets counted as an error
+        raise
 
     return bitfield
 
